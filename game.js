@@ -9,19 +9,19 @@
 const CLS_COLOR = { 'ЛТ': '#6fd3ff', 'СТ': '#39ff88', 'ВТ': '#ffd23f', 'ПТ': '#c07eff' };
 
 const TANKS = {
-  kadet:   { name: 'Т-10 «Кадет»',    cls: 'ЛТ', tier: 1, hp: 12, dmg: 2, fireCd: 550, speed: 2.0, armor: 0, bulletSpeed: 6.0, size: 32,
+  kadet:   { name: 'Т-10 «Кадет»',    cls: 'ЛТ', tier: 1, hp: 12, dmg: 2, fireCd: 550, speed: 1.7, armor: 0, bulletSpeed: 6.0, size: 32,
              prev: null,      research: 0,    cost: 0,     desc: 'Навчальний танк. З нього починається кожен герой.' },
-  sokil:   { name: 'Т-25 «Сокіл»',    cls: 'ЛТ', tier: 2, hp: 15, dmg: 2, fireCd: 420, speed: 2.6, armor: 0, bulletSpeed: 7.0, size: 32,
+  sokil:   { name: 'Т-25 «Сокіл»',    cls: 'ЛТ', tier: 2, hp: 15, dmg: 2, fireCd: 420, speed: 2.2, armor: 0, bulletSpeed: 7.0, size: 32,
              prev: 'kadet',   research: 250,  cost: 600,   desc: 'Швидкий розвідник. Літає по карті, жалить і тікає.' },
-  veteran: { name: 'Т-34 «Ветеран»',  cls: 'СТ', tier: 3, hp: 22, dmg: 3, fireCd: 500, speed: 2.1, armor: 1, bulletSpeed: 7.0, size: 34,
+  veteran: { name: 'Т-34 «Ветеран»',  cls: 'СТ', tier: 3, hp: 22, dmg: 3, fireCd: 500, speed: 1.8, armor: 1, bulletSpeed: 7.0, size: 34,
              prev: 'sokil',   research: 600,  cost: 1800,  desc: 'Легендарний універсал. Надійний у будь-якій ситуації.' },
-  bastion: { name: 'КВ-1 «Бастіон»',  cls: 'ВТ', tier: 4, hp: 34, dmg: 4, fireCd: 620, speed: 1.6, armor: 2, bulletSpeed: 7.0, size: 38,
+  bastion: { name: 'КВ-1 «Бастіон»',  cls: 'ВТ', tier: 4, hp: 34, dmg: 4, fireCd: 620, speed: 1.4, armor: 2, bulletSpeed: 7.0, size: 38,
              prev: 'veteran', research: 1400, cost: 4500,  desc: 'Важка броня. Снаряди рикошетять, вороги плачуть.' },
-  molot:   { name: 'ІС-7 «Молот»',    cls: 'ВТ', tier: 5, hp: 48, dmg: 5, fireCd: 660, speed: 1.5, armor: 3, bulletSpeed: 7.5, size: 40,
+  molot:   { name: 'ІС-7 «Молот»',    cls: 'ВТ', tier: 5, hp: 48, dmg: 5, fireCd: 660, speed: 1.3, armor: 3, bulletSpeed: 7.5, size: 40,
              prev: 'bastion', research: 3000, cost: 10000, desc: 'Вершина гілки важких. Сталева фортеця на гусеницях.' },
-  osa:     { name: 'СУ-85 «Оса»',     cls: 'ПТ', tier: 4, hp: 18, dmg: 6, fireCd: 850, speed: 1.8, armor: 0, bulletSpeed: 9.0, size: 34,
+  osa:     { name: 'СУ-85 «Оса»',     cls: 'ПТ', tier: 4, hp: 18, dmg: 6, fireCd: 850, speed: 1.5, armor: 0, bulletSpeed: 9.0, size: 34,
              prev: 'veteran', research: 1400, cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
-  kobra:   { name: 'ІСУ-152 «Кобра»', cls: 'ПТ', tier: 5, hp: 24, dmg: 9, fireCd: 980, speed: 1.6, armor: 1, bulletSpeed: 10.0, size: 36,
+  kobra:   { name: 'ІСУ-152 «Кобра»', cls: 'ПТ', tier: 5, hp: 24, dmg: 9, fireCd: 980, speed: 1.4, armor: 1, bulletSpeed: 10.0, size: 36,
              prev: 'osa',     research: 3000, cost: 10000, desc: 'Топова ПТ-САУ. «Бах» — і ворога більше немає.' },
 };
 const TREE_ORDER = ['kadet', 'sokil', 'veteran', 'bastion', 'molot', 'osa', 'kobra'];
@@ -74,9 +74,11 @@ function tankSave(id) {
 }
 
 // ---------- Карти боїв ----------
-// '.'=пусто '#'=цегла '@'=сталь '~'=вода '*'=кущі 'P'=гравець 'E'=спавн ворогів
+// '.'=пусто '#'=цегла '@'=сталь '~'=вода '*'=кущі 's'=пісок 'o'=бочка 'H'=штаб
+// 'P'=гравець 'E'=спавн ворогів
+// mode: 'clear' — знищ усіх ворогів; 'assault' — знищ штаб, вороги нескінченні
 const MAPS = [
-  { name: 'Полігон', map: [
+  { name: 'Полігон', mode: 'clear', map: [
     'E......EE......E',
     '................',
     '..##..#..#..##..',
@@ -92,7 +94,7 @@ const MAPS = [
     '................',
     '.......P........',
   ]},
-  { name: 'Міські руїни', map: [
+  { name: 'Міські руїни', mode: 'clear', map: [
     'E.....E..E.....E',
     '.####........##.',
     '.#..#..####..##.',
@@ -108,7 +110,7 @@ const MAPS = [
     '................',
     '.......P........',
   ]},
-  { name: 'Річкова переправа', map: [
+  { name: 'Річкова переправа', mode: 'clear', map: [
     'E......EE......E',
     '................',
     '..##........##..',
@@ -124,7 +126,7 @@ const MAPS = [
     '................',
     '.......P........',
   ]},
-  { name: 'Сталева фортеця', map: [
+  { name: 'Сталева фортеця', mode: 'clear', map: [
     'E.....E..E.....E',
     '.@.....##.....@.',
     '...##..##..##...',
@@ -140,7 +142,7 @@ const MAPS = [
     '................',
     '.......P........',
   ]},
-  { name: 'Арена генерала', map: [
+  { name: 'Арена генерала', mode: 'clear', map: [
     'E......EE......E',
     '................',
     '..@..........@..',
@@ -156,14 +158,78 @@ const MAPS = [
     '................',
     '.......P........',
   ]},
+  { name: 'Пустельний рубіж', mode: 'clear', map: [
+    'E......EE......E',
+    '................',
+    '..##..ssss..##..',
+    '..##..ssss..##..',
+    '....o......o....',
+    '.@....####....@.',
+    '......#..#......',
+    '..sss.#..#.sss..',
+    '..sss.o..o.sss..',
+    '......####......',
+    '..##........##..',
+    '..##..o..o..##..',
+    '......ssss......',
+    '.......P........',
+  ]},
+  { name: 'Склад боєприпасів', mode: 'clear', map: [
+    'E.....E..E.....E',
+    '.##..........##.',
+    '.##..o....o..##.',
+    '......####......',
+    '..o..........o..',
+    '....########....',
+    '....#.o..o.#....',
+    '....#......#....',
+    '....##.oo.##....',
+    '..o..........o..',
+    '..###..##..###..',
+    '.....o....o.....',
+    '................',
+    '.......P........',
+  ]},
+  { name: 'Штурм: Командний центр', mode: 'assault', map: [
+    'E.....@HH@.....E',
+    '.......##.......',
+    '..##........##..',
+    '..##..o..o..##..',
+    '................',
+    '.@....####....@.',
+    '......#..#......',
+    '..ss........ss..',
+    '..ss..o..o..ss..',
+    '....########....',
+    '......s..s......',
+    '..##........##..',
+    '................',
+    '.......P........',
+  ]},
+  { name: 'Штурм: Радарна база', mode: 'assault', map: [
+    'E.....E..E.....E',
+    '................',
+    '...##.@HH@.##...',
+    '...##..##..##...',
+    '......o..o......',
+    '................',
+    '.@@..######..@@.',
+    '.....#....#.....',
+    '..s..#.oo.#..s..',
+    '..s..#....#..s..',
+    '.....##..##.....',
+    '..##........##..',
+    '................',
+    '.......P........',
+  ]},
 ];
 
 // ---------- Вороги ----------
 const ENEMY_TYPES = {
-  scout:   { hp: 2,  speed: 2.0, size: 32, dmg: 2, fireCd: 1500, credits: 70,  xp: 14, color: '#6fd3ff' },
-  soldier: { hp: 4,  speed: 1.4, size: 34, dmg: 2, fireCd: 1200, credits: 110, xp: 22, color: '#ff9d5c' },
-  heavy:   { hp: 8,  speed: 1.0, size: 36, dmg: 3, fireCd: 1100, credits: 180, xp: 36, color: '#e06666' },
-  boss:    { hp: 55, speed: 0.9, size: 56, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
+  scout:   { hp: 2,  speed: 1.7, size: 32, dmg: 2, fireCd: 1500, credits: 70,  xp: 14, color: '#6fd3ff' },
+  soldier: { hp: 4,  speed: 1.2, size: 34, dmg: 2, fireCd: 1200, credits: 110, xp: 22, color: '#ff9d5c' },
+  heavy:   { hp: 8,  speed: 0.9, size: 36, dmg: 3, fireCd: 1100, credits: 180, xp: 36, color: '#e06666' },
+  boss:    { hp: 55, speed: 0.8, size: 56, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
 };
 
 function buildRoster(tier, elite) {
@@ -196,11 +262,10 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const TILE = 40, COLS = 16, ROWS = 14;
 const W = COLS * TILE, H = ROWS * TILE;
-const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4;
+const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 let grid, gridHp, player, enemies, bullets, particles, drops;
-let mouse = { x: 0, y: 0, active: false };
 let spawnQueue, spawnPoints, spawnTimer, maxAlive;
 let battle; // статистика поточного бою
 let state = 'hangar';
@@ -239,8 +304,8 @@ function startBattle() {
   const mapDef = MAPS[Math.floor(Math.random() * MAPS.length)];
 
   battle = {
-    tank: st, elite, mapName: mapDef.name,
-    frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false,
+    tank: st, elite, mapName: mapDef.name, mode: mapDef.mode || 'clear',
+    frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0, fragStreak: 0,
     perks: [],
     tierMult: 1 + 0.3 * (st.tier - 1),
@@ -265,11 +330,18 @@ function startBattle() {
       else if (ch === '@') { t = T_STEEL; hp = 6; }
       else if (ch === '~') t = T_WATER;
       else if (ch === '*') t = T_BUSH;
+      else if (ch === 's') t = T_SAND;
+      else if (ch === 'o') { t = T_BARREL; hp = 1; }
+      else if (ch === 'H') { t = T_HQ; hp = 14 + 5 * st.tier; }
       else if (ch === 'P') { player.x = c * TILE + TILE / 2; player.y = r * TILE + TILE / 2; }
       else if (ch === 'E') spawnPoints.push({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 });
       grid[r][c] = t; gridHp[r][c] = hp;
     }
   }
+
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (grid[r][c] === T_HQ) battle.hqLeft++;
 
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
@@ -284,6 +356,9 @@ function startBattle() {
   document.getElementById('perkOverlay').classList.add('hidden');
   document.body.classList.add('inBattle');
   document.getElementById('uiTankName').textContent = st.name + (elite ? ' ☠' : '');
+  document.getElementById('uiObjective').textContent = battle.mode === 'assault'
+    ? '🎯 Ціль: знищ ворожий ШТАБ! Вороги прибуватимуть нескінченно.'
+    : '🎯 Ціль: знищ усі ворожі танки.';
   document.getElementById('perkList').textContent = '';
 
   state = 'play';
@@ -308,9 +383,13 @@ function scaledEnemy(typeName, tier) {
 function solidAt(x, y, forBullet) {
   if (x < 0 || y < 0 || x >= W || y >= H) return true;
   const t = grid[Math.floor(y / TILE)][Math.floor(x / TILE)];
-  if (t === T_EMPTY || t === T_BUSH) return false;
+  if (t === T_EMPTY || t === T_BUSH || t === T_SAND) return false;
   if (t === T_WATER) return !forBullet;
   return true;
+}
+function tileAt(x, y) {
+  const r = Math.floor(y / TILE), c = Math.floor(x / TILE);
+  return grid[r] ? grid[r][c] : T_EMPTY;
 }
 function rectFree(x, y, size, forBullet) {
   const h = size / 2 - 0.01;
@@ -391,19 +470,26 @@ function shoot(tank, isPlayer) {
     // вороги стріляють у гравця з невеликим розкидом
     const ang = Math.atan2(player.y - tank.y, player.x - tank.x) + (Math.random() - 0.5) * 0.24;
     tank.turretAngle = ang;
-    fireBullet(tank, ang, 4.2, tank.dmg, false);
+    fireBullet(tank, ang, 3.9, tank.dmg, false);
   }
 }
 function bossSpreadShot(boss) {
   const ang = Math.atan2(player.y - boss.y, player.x - boss.x);
   boss.turretAngle = ang;
   for (const a of [ang - 0.35, ang, ang + 0.35]) {
-    fireBullet(boss, a, 4.2, boss.dmg, false);
+    fireBullet(boss, a, 3.9, boss.dmg, false);
   }
 }
 
 // ---------- Спавн і AI ----------
 function trySpawnEnemy(dt) {
+  // у штурмі підкріплення не закінчуються
+  if (battle.mode === 'assault' && !spawnQueue.length) {
+    const tier = battle.tank.tier;
+    const r = Math.random();
+    spawnQueue.push(tier <= 2 ? (r < 0.6 ? 'scout' : 'soldier')
+      : (r < 0.3 ? 'scout' : r < 0.75 ? 'soldier' : 'heavy'));
+  }
   if (!spawnQueue.length) return;
   if (enemies.length >= maxAlive) return;
   spawnTimer -= dt;
@@ -435,8 +521,9 @@ function updateEnemy(e, dt) {
     }
   }
   if (e.flash > 0) e.flash -= dt;
-  if (!moveTank(e, e.wantDir || 'down', e.speed)) e.thinkTimer = 0;
-  else e.tread = (e.tread || 0) + e.speed;
+  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.55 : 1);
+  if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
+  else e.tread = (e.tread || 0) + eSpeed;
 
   // башта завжди дивиться на гравця
   e.turretAngle = Math.atan2(player.y - e.y, player.x - e.x);
@@ -465,6 +552,22 @@ function updateBullets(dt) {
 
     const c = Math.floor(b.x / TILE), r = Math.floor(b.y / TILE);
     const t = grid[r] && grid[r][c];
+    if (t === T_BARREL) {
+      b.dead = true;
+      explodeBarrel(r, c);
+      continue;
+    }
+    if (t === T_HQ) {
+      b.dead = true;
+      if (b.fromPlayer) {
+        gridHp[r][c] -= b.dmg;
+        battle.dmgDealt += b.dmg;
+        sfx.hit();
+        spawnParticles(b.x, b.y, '#ff4d5e', 6);
+        if (gridHp[r][c] <= 0) destroyHQ(r, c);
+      }
+      continue;
+    }
     if (t === T_BRICK || t === T_STEEL) {
       b.dead = true;
       if (t === T_BRICK) {
@@ -531,6 +634,54 @@ function updateBullets(dt) {
   bullets = bullets.filter(b => !b.dead);
 }
 
+// ---------- Вибухові бочки та штаб ----------
+function explodeBarrel(r, c) {
+  if (grid[r][c] !== T_BARREL) return;
+  grid[r][c] = T_EMPTY;
+  const bx = c * TILE + TILE / 2, by = r * TILE + TILE / 2;
+  sfx.boom();
+  shakeTime = 300;
+  spawnParticles(bx, by, '#ff9d3c', 26);
+  spawnParticles(bx, by, '#ffd23f', 14);
+
+  const R = 85;
+  // шкода танкам в радіусі — і ворогам, і гравцю!
+  for (const e of enemies) {
+    if (e.dead || e.spawning > 0) continue;
+    if (Math.hypot(e.x - bx, e.y - by) < R) {
+      e.hp -= 6;
+      battle.dmgDealt += 6;
+      if (e.hp <= 0) killEnemy(e);
+    }
+  }
+  if (Math.hypot(player.x - bx, player.y - by) < R && player.invuln <= 0) {
+    const dmg = Math.max(1, 5 - player.armor);
+    player.hp -= dmg;
+    player.invuln = 600;
+    floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
+    if (player.hp <= 0) { endBattle(false); return; }
+  }
+  // руйнує сусідню цеглу і підриває сусідні бочки ланцюгом
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    const rr = r + dr, cc = c + dc;
+    if (!grid[rr]) continue;
+    if (grid[rr][cc] === T_BRICK) grid[rr][cc] = T_EMPTY;
+    else if (grid[rr][cc] === T_BARREL) explodeBarrel(rr, cc);
+  }
+}
+
+function destroyHQ(r, c) {
+  grid[r][c] = T_EMPTY;
+  const bx = c * TILE + TILE / 2, by = r * TILE + TILE / 2;
+  sfx.boom();
+  shakeTime = 500;
+  spawnParticles(bx, by, '#ff4d5e', 40);
+  battle.hqLeft--;
+  battle.credits += 400;
+  floatText(bx, by, 'ШТАБ ЗНИЩЕНО! +400 🪙', '#ffd23f');
+  if (battle.hqLeft <= 0) endBattle(true);
+}
+
 // ---------- Події бою ----------
 function killEnemy(e) {
   e.dead = true;
@@ -558,7 +709,7 @@ function killEnemy(e) {
     openPerkMenu();
   }
 
-  if (spawnQueue.length === 0 && enemies.every(x => x.dead)) endBattle(true);
+  if (battle.mode === 'clear' && spawnQueue.length === 0 && enemies.every(x => x.dead)) endBattle(true);
 }
 
 function endBattle(victory) {
@@ -566,7 +717,7 @@ function endBattle(victory) {
   state = 'results';
 
   const mult = battle.tierMult * (battle.elite ? 2 : 1);
-  const winBonus = victory ? Math.round(250 * battle.tank.tier) : 0;
+  const winBonus = victory ? Math.round((battle.mode === 'assault' ? 350 : 250) * battle.tank.tier) : 0;
   const creditsEarned = Math.round(battle.credits * mult) + winBonus;
   const xpEarned = Math.round((battle.xp + (victory ? 60 * battle.tank.tier : 0)) * mult);
 
@@ -587,7 +738,7 @@ function endBattle(victory) {
   document.getElementById('resultTitle').style.color = victory ? '#ffd23f' : '#ff4d5e';
   document.getElementById('resultTable').innerHTML = `
     <tr><td>Карта</td><td>${battle.mapName}${battle.elite ? ' ☠ (елітний ×2)' : ''}</td></tr>
-    <tr><td>Фраги</td><td>${battle.frags} / ${battle.totalEnemies}</td></tr>
+    <tr><td>Фраги</td><td>${battle.frags}${battle.mode === 'clear' ? ' / ' + battle.totalEnemies : ''}</td></tr>
     <tr><td>Завдано урону</td><td>${battle.dmgDealt}</td></tr>
     <tr><td>Рикошети</td><td>${battle.ricochets}</td></tr>
     <tr><td>Срібло</td><td>+${creditsEarned} 🪙</td></tr>
@@ -687,18 +838,16 @@ function updatePlayer(dt) {
   else if (keys.down) dir = 'down';
   else if (keys.left) dir = 'left';
   else if (keys.right) dir = 'right';
-  const dist = player.speed * dt / 16.67;
+  // пісок сповільнює наполовину
+  const sandMult = tileAt(player.x, player.y) === T_SAND ? 0.55 : 1;
+  const dist = player.speed * sandMult * dt / 16.67;
   if (dir && moveTank(player, dir, dist)) player.tread = (player.tread || 0) + dist;
 
-  // прицілювання: мишкою — точно, без мишки — автоприціл у найближчого ворога
-  if (mouse.active) {
-    player.turretAngle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-  } else {
-    const target = nearestEnemy();
-    player.turretAngle = target
-      ? Math.atan2(target.y - player.y, target.x - player.x)
-      : DIR_ANGLE[player.dir];
-  }
+  // автоприціл: найближчий видимий ворог, у штурмі — ще й штаб
+  const target = nearestTarget();
+  player.turretAngle = target
+    ? Math.atan2(target.y - player.y, target.x - player.x)
+    : DIR_ANGLE[player.dir];
 
   if (keys.fire && player.cooldown <= 0) {
     shoot(player, true);
@@ -706,13 +855,19 @@ function updatePlayer(dt) {
   }
 }
 
-function nearestEnemy() {
+function nearestTarget() {
   let best = null, bestD = Infinity, bestLOS = null, bestLOSD = Infinity;
+  const consider = (x, y) => {
+    const d = Math.hypot(x - player.x, y - player.y);
+    if (d < bestD) { bestD = d; best = { x, y }; }
+    if (d < bestLOSD && hasLOS(player.x, player.y, x, y)) { bestLOSD = d; bestLOS = { x, y }; }
+  };
   for (const e of enemies) {
-    if (e.dead || e.spawning > 0) continue;
-    const d = Math.hypot(e.x - player.x, e.y - player.y);
-    if (d < bestD) { bestD = d; best = e; }
-    if (d < bestLOSD && hasLOS(player.x, player.y, e.x, e.y)) { bestLOSD = d; bestLOS = e; }
+    if (!e.dead && !(e.spawning > 0)) consider(e.x, e.y);
+  }
+  if (battle.mode === 'assault') {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+      if (grid[r][c] === T_HQ) consider(c * TILE + TILE / 2, r * TILE + TILE / 2);
   }
   return bestLOS || best;
 }
@@ -748,6 +903,61 @@ function drawTile(r, c) {
     const ph = Math.sin(performance.now() / 400 + r + c) * 4;
     ctx.fillRect(x + 4, y + 12 + ph, 12, 3);
     ctx.fillRect(x + 22, y + 26 - ph, 12, 3);
+  } else if (t === T_SAND) {
+    ctx.fillStyle = '#5a4a2e';
+    ctx.fillRect(x, y, TILE, TILE);
+    ctx.fillStyle = 'rgba(220,190,120,.25)';
+    ctx.fillRect(x + ((r * 7 + c * 13) % 20), y + ((r * 11 + c * 5) % 24), 4, 4);
+    ctx.fillRect(x + ((r * 3 + c * 17) % 28), y + ((r * 13 + c * 7) % 30), 3, 3);
+    ctx.fillRect(x + ((r * 19 + c * 3) % 32), y + ((r * 5 + c * 11) % 18), 3, 3);
+  } else if (t === T_BARREL) {
+    ctx.fillStyle = '#1a2233';
+    ctx.fillRect(x, y, TILE, TILE);
+    const puls = 0.85 + Math.sin(performance.now() / 300 + r * 2 + c) * 0.15;
+    ctx.save();
+    ctx.shadowColor = '#ff9d3c';
+    ctx.shadowBlur = 10 * puls;
+    const bg = ctx.createRadialGradient(x + 14, y + 14, 3, x + 20, y + 20, 16);
+    bg.addColorStop(0, '#ff9d5c');
+    bg.addColorStop(1, '#a83b1e');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(x + 20, y + 20, 13, 0, 7);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#ffd23f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 9, y + 20); ctx.lineTo(x + 31, y + 20);
+    ctx.stroke();
+    ctx.fillStyle = '#0e1320';
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('☢', x + 20, y + 20);
+  } else if (t === T_HQ) {
+    ctx.fillStyle = '#2a1a22';
+    ctx.fillRect(x, y, TILE, TILE);
+    ctx.strokeStyle = '#ff4d5e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 3, y + 3, TILE - 6, TILE - 6);
+    const puls = 0.7 + Math.sin(performance.now() / 250) * 0.3;
+    ctx.save();
+    ctx.shadowColor = '#ff4d5e';
+    ctx.shadowBlur = 14 * puls;
+    ctx.fillStyle = '#ff4d5e';
+    ctx.font = '22px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('☭', x + TILE / 2, y + TILE / 2 + 1);
+    ctx.restore();
+    // смужка міцності штабу
+    const maxHp = 14 + 5 * battle.tank.tier;
+    const frac = Math.max(0, gridHp[r][c] / maxHp);
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(x + 2, y - 7, TILE - 4, 5);
+    ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
+    ctx.fillRect(x + 2, y - 7, (TILE - 4) * frac, 5);
   }
 }
 function drawBush(r, c) {
@@ -989,21 +1199,15 @@ function draw() {
     for (let c = 0; c < COLS; c++)
       if (grid[r][c] === T_BUSH) drawBush(r, c);
 
-  // приціл з кільцем перезарядки
-  if (mouse.active && (state === 'play' || state === 'perk')) {
+  // кільце перезарядки навколо танка гравця
+  if (state === 'play' || state === 'perk') {
     const ready = player.cooldown <= 0;
-    const frac = ready ? 1 : 1 - player.cooldown / player.fireCd;
-    ctx.strokeStyle = ready ? 'rgba(57,255,136,.9)' : 'rgba(255,210,63,.8)';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(mouse.x, mouse.y, 11, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = ready ? 'rgba(57,255,136,.7)' : 'rgba(255,210,63,.5)';
-    ctx.lineWidth = 1.5;
-    for (const [ax, ay] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+    if (!ready) {
+      const frac = 1 - player.cooldown / player.fireCd;
+      ctx.strokeStyle = 'rgba(255,210,63,.75)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(mouse.x + ax * 5, mouse.y + ay * 5);
-      ctx.lineTo(mouse.x + ax * 15, mouse.y + ay * 15);
+      ctx.arc(player.x, player.y, player.size / 2 + 8, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -1027,7 +1231,9 @@ function draw() {
 
 function updateBattleHud() {
   document.getElementById('uiFrags').textContent = battle.frags;
-  document.getElementById('uiEnemies').textContent = spawnQueue.length + enemies.filter(e => !e.dead).length;
+  document.getElementById('uiEnemies').textContent = battle.mode === 'assault'
+    ? '∞ (штаб: ' + battle.hqLeft + ')'
+    : spawnQueue.length + enemies.filter(e => !e.dead).length;
   document.getElementById('uiRico').textContent = battle.ricochets;
   document.getElementById('hpBar').style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
   document.getElementById('perkBar').style.width = (battle.fragStreak / 3 * 100) + '%';
@@ -1243,21 +1449,6 @@ document.addEventListener('keydown', e => {
   }
 });
 document.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
-
-// прицілювання мишкою
-canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
-  mouse.active = true;
-});
-canvas.addEventListener('mousedown', e => {
-  if (state === 'play') { keys.fire = true; e.preventDefault(); }
-});
-document.addEventListener('mouseup', () => { keys.fire = false; });
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-// тач по канвасу вимикає мишачий приціл (повертає автоприціл)
-canvas.addEventListener('touchstart', () => { mouse.active = false; }, { passive: true });
 
 document.getElementById('battleBtn').onclick = startBattle;
 document.getElementById('toHangarBtn').onclick = toHangar;

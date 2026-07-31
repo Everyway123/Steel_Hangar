@@ -97,7 +97,6 @@
     background: #05070c; border: 2px solid var(--border); border-radius: 6px;
     display: block; image-rendering: pixelated; max-width: 100%; height: auto;
   }
-  #game { cursor: none; }
   #battlePanel {
     width: 240px; background: var(--panel); border: 2px solid var(--border);
     border-radius: 6px; padding: 14px; font-size: 14px;
@@ -219,6 +218,7 @@
 
   <div id="battlePanel">
     <h2 id="uiTankName">Танк</h2>
+    <div class="label" id="uiObjective" style="margin-bottom:8px"></div>
     <div class="statRow"><span>Фраги</span><span class="val" id="uiFrags">0</span></div>
     <div class="statRow"><span>Ворогів лишилось</span><span class="val" id="uiEnemies">0</span></div>
     <div class="statRow"><span>Рикошети</span><span class="val" id="uiRico">0</span></div>
@@ -228,13 +228,13 @@
     <div class="barWrap"><div class="bar" id="perkBar" style="width:0%"></div></div>
     <div id="perkList"></div>
     <div id="controlsHint">
-      WASD / стрілки — рух корпусу<br>
-      Мишка — приціл башти (360°)<br>
-      ЛКМ або пробіл — вогонь<br>
-      Без мишки — автоприціл<br>
+      WASD / стрілки — рух<br>
+      Пробіл — вогонь (автоприціл сам веде башту)<br>
       Esc — покинути бій<br>
       💊 аптечка · ⭐ срібло · ❄ заморозка<br>
-      Ховайся за стінами — вороги стріляють лише коли бачать тебе!
+      ☢ бочки вибухають — підривай ворогів!<br>
+      🏜 пісок сповільнює всіх<br>
+      Ховайся за стінами — вороги стріляють лише коли бачать тебе
     </div>
   </div>
 </div>
