@@ -97,6 +97,7 @@
     background: #05070c; border: 2px solid var(--border); border-radius: 6px;
     display: block; image-rendering: pixelated; max-width: 100%; height: auto;
   }
+  #game { cursor: none; }
   #battlePanel {
     width: 240px; background: var(--panel); border: 2px solid var(--border);
     border-radius: 6px; padding: 14px; font-size: 14px;
@@ -227,10 +228,13 @@
     <div class="barWrap"><div class="bar" id="perkBar" style="width:0%"></div></div>
     <div id="perkList"></div>
     <div id="controlsHint">
-      WASD / стрілки — рух<br>
-      Пробіл — вогонь<br>
+      WASD / стрілки — рух корпусу<br>
+      Мишка — приціл башти (360°)<br>
+      ЛКМ або пробіл — вогонь<br>
+      Без мишки — автоприціл<br>
       Esc — покинути бій<br>
-      💊 аптечка · ⭐ срібло · ❄ заморозка
+      💊 аптечка · ⭐ срібло · ❄ заморозка<br>
+      Ховайся за стінами — вороги стріляють лише коли бачать тебе!
     </div>
   </div>
 </div>
