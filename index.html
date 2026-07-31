@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>СТАЛЕВИЙ АНГАР — танкові бої з прокачкою</title>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #121826;
+    --panel2: #0d1420;
+    --border: #263149;
+    --neon: #39ff88;
+    --gold: #ffd23f;
+    --danger: #ff4d5e;
+    --blue: #2fb7ff;
+    --text: #d7e0f0;
+    --dim: #7a8aa8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 10px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .hidden { display: none !important; }
+  h1, h2 { letter-spacing: 2px; }
+
+  /* ======== АНГАР ======== */
+  #hangarView { width: 100%; max-width: 960px; }
+  #hangarHead {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
+    padding: 12px 18px; margin-bottom: 12px;
+  }
+  #hangarHead h1 { font-size: 20px; color: var(--neon); text-shadow: 0 0 10px rgba(57,255,136,.5); }
+  #hangarHead .res { display: flex; gap: 18px; font-size: 15px; }
+  #hangarHead .res b { color: var(--gold); }
+  #hangarMain { display: flex; gap: 12px; flex-wrap: wrap; }
+  #treeCol { flex: 1 1 380px; }
+  #detailCol { flex: 1 1 380px; }
+  .box {
+    background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .box h2 { font-size: 15px; color: var(--blue); margin-bottom: 10px; }
+  .tankNode {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 9px 12px; margin-bottom: 7px; cursor: pointer;
+  }
+  .tankNode:hover { border-color: var(--blue); }
+  .tankNode.sel { border-color: var(--neon); box-shadow: 0 0 8px rgba(57,255,136,.3); }
+  .tankNode.locked { opacity: .55; }
+  .tankNode .tn { font-size: 14px; }
+  .tankNode .cls { font-size: 11px; color: var(--dim); }
+  .tankNode .badge { font-size: 11px; color: var(--gold); white-space: nowrap; }
+  .branchLabel { color: var(--dim); font-size: 11px; margin: 10px 0 5px; border-top: 1px dashed var(--border); padding-top: 8px; }
+  .statRow { display: flex; justify-content: space-between; margin: 4px 0; font-size: 14px; }
+  .statRow .val { color: var(--gold); }
+  .modRow {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin: 6px 0; font-size: 13px;
+  }
+  .pips { color: var(--neon); letter-spacing: 2px; }
+  .btn {
+    background: transparent; border: 2px solid var(--neon); color: var(--neon);
+    font-family: inherit; font-size: 14px; padding: 8px 18px; border-radius: 4px;
+    cursor: pointer; letter-spacing: 1px;
+  }
+  .btn:hover:not(:disabled) { background: var(--neon); color: #05070c; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.gold { border-color: var(--gold); color: var(--gold); }
+  .btn.gold:hover:not(:disabled) { background: var(--gold); color: #05070c; }
+  .btn.small { font-size: 11px; padding: 4px 10px; }
+  .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .btn.danger:hover:not(:disabled) { background: var(--danger); color: #05070c; }
+  #battleBtn {
+    width: 100%; font-size: 20px; padding: 14px;
+    text-shadow: 0 0 8px rgba(255,210,63,.5);
+  }
+  #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .4; } }
+  #hangarFoot { text-align: center; color: var(--dim); font-size: 11px; margin-top: 4px; }
+
+  /* ======== БІЙ ======== */
+  #battleView { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  #gameBox { position: relative; }
+  canvas {
+    background: #05070c; border: 2px solid var(--border); border-radius: 6px;
+    display: block; image-rendering: pixelated; max-width: 100%; height: auto;
+  }
+  #battlePanel {
+    width: 240px; background: var(--panel); border: 2px solid var(--border);
+    border-radius: 6px; padding: 14px; font-size: 14px;
+  }
+  #battlePanel h2 { font-size: 15px; color: var(--neon); margin-bottom: 8px; }
+  .barWrap {
+    background: #05070c; border: 1px solid var(--border); border-radius: 3px;
+    height: 16px; margin: 4px 0 10px; overflow: hidden;
+  }
+  .bar { height: 100%; transition: width .15s; }
+  #hpBar { background: linear-gradient(90deg, #ff4d5e, #ff8c69); }
+  #perkBar { background: linear-gradient(90deg, #2fb7ff, #39ff88); }
+  .label { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  #perkList { font-size: 12px; color: var(--dim); margin-top: 8px; line-height: 1.6; }
+  #controlsHint { margin-top: 12px; color: var(--dim); font-size: 11px; line-height: 1.5; border-top: 1px dashed var(--border); padding-top: 8px; }
+
+  .overlay {
+    position: absolute; inset: 0; background: rgba(5,7,12,.9);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; border-radius: 6px; padding: 20px; z-index: 5;
+  }
+  .overlay h2 { color: var(--neon); font-size: 28px; text-shadow: 0 0 14px rgba(57,255,136,.7); margin-bottom: 10px; }
+  .overlay p { margin: 5px 0; font-size: 15px; line-height: 1.5; }
+  .overlay .sub { color: var(--dim); font-size: 13px; }
+  #cards { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .card {
+    width: 150px; background: var(--panel); border: 2px solid var(--border); border-radius: 6px;
+    padding: 14px 10px; cursor: pointer; transition: transform .1s, border-color .1s;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--gold); }
+  .card .ico { font-size: 30px; }
+  .card .nm { color: var(--gold); font-size: 14px; margin: 8px 0 6px; font-weight: bold; }
+  .card .ds { color: var(--dim); font-size: 11px; line-height: 1.4; }
+  .card .key { color: var(--neon); font-size: 11px; margin-top: 8px; }
+  #resultTable { margin: 10px auto; font-size: 14px; text-align: left; }
+  #resultTable td { padding: 3px 12px; }
+  #resultTable td:last-child { color: var(--gold); text-align: right; }
+  #medals { margin-top: 8px; font-size: 14px; color: var(--gold); line-height: 1.7; }
+
+  /* ======== Сенсорні кнопки ======== */
+  #touchPad {
+    display: none; position: fixed; bottom: 10px; left: 0; right: 0;
+    justify-content: space-between; padding: 0 18px; z-index: 10; pointer-events: none;
+  }
+  #dpad { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(3, 54px); gap: 4px; pointer-events: auto; }
+  .tbtn {
+    background: rgba(38,49,73,.6); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 22px; display: flex; align-items: center; justify-content: center;
+    touch-action: none;
+  }
+  .tbtn:active { background: rgba(57,255,136,.4); }
+  #fireBtn {
+    width: 84px; height: 84px; border-radius: 50%;
+    background: rgba(255,77,94,.5); border: 2px solid var(--danger);
+    font-size: 26px; align-self: center; pointer-events: auto; touch-action: none;
+  }
+  @media (pointer: coarse) { body.inBattle #touchPad { display: flex; } }
+</style>
+</head>
+<body>
+
+<!-- ==================== АНГАР ==================== -->
+<div id="hangarView">
+  <div id="hangarHead">
+    <h1>⚙ СТАЛЕВИЙ АНГАР</h1>
+    <div class="res">
+      <span>🪙 <b id="uiCredits">0</b></span>
+      <span>⚔ Боїв: <b id="uiBattles">0</b></span>
+      <span>🏆 Перемог: <b id="uiWins">0</b></span>
+    </div>
+  </div>
+  <div id="hangarMain">
+    <div id="treeCol">
+      <div class="box">
+        <h2>🌳 ГІЛКА ДОСЛІДЖЕНЬ</h2>
+        <div id="treeList"></div>
+      </div>
+    </div>
+    <div id="detailCol">
+      <div class="box">
+        <h2 id="tankTitle">ТАНК</h2>
+        <canvas id="tankPreview" width="180" height="110"></canvas>
+        <div id="tankStats"></div>
+      </div>
+      <div class="box">
+        <h2>🔧 МОДУЛІ <span style="color:var(--dim);font-size:11px">(покращення купуються за срібло)</span></h2>
+        <div id="modList"></div>
+      </div>
+      <div class="box">
+        <button class="btn gold" id="battleBtn">⚔ В БІЙ!</button>
+        <div id="eliteBanner" class="hidden">☠ НАСТУПНИЙ БІЙ — ЕЛІТНИЙ: БОС І ПОДВІЙНА НАГОРОДА ☠</div>
+      </div>
+    </div>
+  </div>
+  <div id="hangarFoot">
+    Прогрес зберігається автоматично в цьому браузері ·
+    <button class="btn danger small" id="resetBtn">скинути прогрес</button>
+  </div>
+</div>
+
+<!-- ==================== БІЙ ==================== -->
+<div id="battleView" class="hidden">
+  <div id="gameBox">
+    <canvas id="game" width="640" height="560"></canvas>
+
+    <div id="perkOverlay" class="overlay hidden">
+      <h2>ТАКТИЧНА ПЕРЕВАГА!</h2>
+      <p class="sub">3 фраги поспіль — обери бонус на цей бій:</p>
+      <div id="cards"></div>
+    </div>
+
+    <div id="resultOverlay" class="overlay hidden">
+      <h2 id="resultTitle">ПЕРЕМОГА!</h2>
+      <table id="resultTable"></table>
+      <div id="medals"></div>
+      <button class="btn" id="toHangarBtn">В АНГАР [Enter]</button>
+    </div>
+  </div>
+
+  <div id="battlePanel">
+    <h2 id="uiTankName">Танк</h2>
+    <div class="statRow"><span>Фраги</span><span class="val" id="uiFrags">0</span></div>
+    <div class="statRow"><span>Ворогів лишилось</span><span class="val" id="uiEnemies">0</span></div>
+    <div class="statRow"><span>Рикошети</span><span class="val" id="uiRico">0</span></div>
+    <div class="label">HP</div>
+    <div class="barWrap"><div class="bar" id="hpBar" style="width:100%"></div></div>
+    <div class="label">До тактичної переваги</div>
+    <div class="barWrap"><div class="bar" id="perkBar" style="width:0%"></div></div>
+    <div id="perkList"></div>
+    <div id="controlsHint">
+      WASD / стрілки — рух<br>
+      Пробіл — вогонь<br>
+      Esc — покинути бій<br>
+      💊 аптечка · ⭐ срібло · ❄ заморозка
+    </div>
+  </div>
+</div>
+
+<div id="touchPad">
+  <div id="dpad">
+    <div></div><div class="tbtn" data-dir="up">▲</div><div></div>
+    <div class="tbtn" data-dir="left">◀</div><div></div><div class="tbtn" data-dir="right">▶</div>
+    <div></div><div class="tbtn" data-dir="down">▼</div><div></div>
+  </div>
+  <div class="tbtn" id="fireBtn">💥</div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
