@@ -370,6 +370,7 @@ function shoot(tank, isPlayer) {
     dmg: isPlayer ? player.dmg : tank.dmg,
     fromPlayer: isPlayer,
   });
+  tank.flash = 90;
   sfx.shoot();
 }
 function bossSpreadShot(boss) {
@@ -378,6 +379,7 @@ function bossSpreadShot(boss) {
     const [dx, dy] = DIRS[d];
     bullets.push({ x: boss.x + dx * 34, y: boss.y + dy * 34, dx, dy, speed: 5, dmg: boss.dmg, fromPlayer: false });
   }
+  boss.flash = 90;
   sfx.shoot();
 }
 
@@ -413,7 +415,9 @@ function updateEnemy(e, dt) {
       e.wantDir = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)];
     }
   }
+  if (e.flash > 0) e.flash -= dt;
   if (!moveTank(e, e.wantDir || 'down', e.speed)) e.thinkTimer = 0;
+  else e.tread = (e.tread || 0) + e.speed;
 
   e.cooldown -= dt;
   if (e.cooldown <= 0) {
@@ -654,13 +658,15 @@ function updateParticles(dt) {
 // ---------- Гравець ----------
 function updatePlayer(dt) {
   if (player.invuln > 0) player.invuln -= dt;
+  if (player.flash > 0) player.flash -= dt;
   player.cooldown -= dt;
   let dir = null;
   if (keys.up) dir = 'up';
   else if (keys.down) dir = 'down';
   else if (keys.left) dir = 'left';
   else if (keys.right) dir = 'right';
-  if (dir) moveTank(player, dir, player.speed * dt / 16.67);
+  const dist = player.speed * dt / 16.67;
+  if (dir && moveTank(player, dir, dist)) player.tread = (player.tread || 0) + dist;
   if (keys.fire && player.cooldown <= 0) {
     shoot(player, true);
     player.cooldown = player.fireCd;
@@ -712,27 +718,134 @@ function drawBush(r, c) {
   }
 }
 
-function drawTankShape(g, s, color, turretColor) {
-  // гусениці
-  g.fillStyle = '#1c2333';
-  g.fillRect(-s / 2, -s / 2, s * 0.22, s);
-  g.fillRect(s / 2 - s * 0.22, -s / 2, s * 0.22, s);
-  g.fillStyle = '#39445e';
-  for (let i = 0; i < 4; i++) {
-    g.fillRect(-s / 2 + 2, -s / 2 + 3 + i * s / 4, s * 0.22 - 4, 3);
-    g.fillRect(s / 2 - s * 0.22 + 2, -s / 2 + 3 + i * s / 4, s * 0.22 - 4, 3);
-  }
-  // корпус
-  g.fillStyle = color;
-  g.fillRect(-s * 0.28, -s * 0.36, s * 0.56, s * 0.72);
-  // башта
-  g.fillStyle = turretColor;
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.min(255, (n >> 16) + amt));
+  const g2 = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+  const b = Math.max(0, Math.min(255, (n & 255) + amt));
+  return `rgb(${r},${g2},${b})`;
+}
+
+function drawTankShape(g, s, color, o = {}) {
+  const tread = o.tread || 0;
+
+  // м'яка тінь під танком
+  g.fillStyle = 'rgba(0,0,0,.45)';
   g.beginPath();
-  g.arc(0, 0, s * 0.18, 0, 7);
+  g.roundRect(-s * 0.5 + 2, -s * 0.48 + 3, s, s * 0.98, s * 0.16);
   g.fill();
-  // дуло
-  g.fillStyle = color;
-  g.fillRect(-3, -s / 2 - 6, 6, s / 2 + 6);
+
+  // гусениці з анімованими траками
+  const tw = s * 0.26;
+  for (const side of [-1, 1]) {
+    const cx = side * (s / 2 - tw / 2);
+    g.fillStyle = '#0e1320';
+    g.beginPath();
+    g.roundRect(cx - tw / 2, -s / 2, tw, s, 5);
+    g.fill();
+    g.fillStyle = '#323e5c';
+    const spacing = 7;
+    const off = -(tread % spacing);
+    for (let yy = -s / 2 + 3 + off; yy < s / 2 - 2; yy += spacing) {
+      if (yy > -s / 2 + 1) g.fillRect(cx - tw / 2 + 2, yy, tw - 4, 2.4);
+    }
+    g.strokeStyle = 'rgba(255,255,255,.07)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.roundRect(cx - tw / 2, -s / 2, tw, s, 5);
+    g.stroke();
+  }
+
+  // обтічний корпус зі скошеним носом
+  const hw = s * 0.33;
+  g.beginPath();
+  g.moveTo(-hw * 0.55, -s * 0.47);
+  g.lineTo(hw * 0.55, -s * 0.47);
+  g.lineTo(hw, -s * 0.26);
+  g.lineTo(hw, s * 0.34);
+  g.quadraticCurveTo(hw, s * 0.44, hw * 0.65, s * 0.44);
+  g.lineTo(-hw * 0.65, s * 0.44);
+  g.quadraticCurveTo(-hw, s * 0.44, -hw, s * 0.34);
+  g.lineTo(-hw, -s * 0.26);
+  g.closePath();
+  const grad = g.createLinearGradient(0, -s / 2, 0, s / 2);
+  grad.addColorStop(0, shade(color, 45));
+  grad.addColorStop(0.45, color);
+  grad.addColorStop(1, shade(color, -55));
+  g.fillStyle = grad;
+  g.fill();
+  // неонова окантовка корпусу
+  g.save();
+  g.shadowColor = color;
+  g.shadowBlur = 9;
+  g.strokeStyle = 'rgba(255,255,255,.4)';
+  g.lineWidth = 1.2;
+  g.stroke();
+  g.restore();
+  // блік на носі
+  g.fillStyle = 'rgba(255,255,255,.22)';
+  g.fillRect(-hw * 0.5, -s * 0.43, hw, 2);
+
+  // маска гармати
+  g.fillStyle = shade(color, -70);
+  g.beginPath();
+  g.roundRect(-4.5, -s * 0.3, 9, s * 0.18, 2);
+  g.fill();
+
+  // дуло з металевим градієнтом і дульним гальмом
+  const bl = s * 0.68;
+  const bgrad = g.createLinearGradient(-3, 0, 3, 0);
+  bgrad.addColorStop(0, '#7c869c');
+  bgrad.addColorStop(0.5, '#e2e9f5');
+  bgrad.addColorStop(1, '#5e677b');
+  g.fillStyle = bgrad;
+  g.fillRect(-2.6, -bl, 5.2, bl - s * 0.12);
+  g.fillStyle = '#39445e';
+  g.beginPath();
+  g.roundRect(-4.2, -bl, 8.4, 7, 2);
+  g.fill();
+
+  // башта з об'ємним градієнтом та люком
+  const tr = s * 0.21;
+  const tg = g.createRadialGradient(-tr * 0.35, tr * -0.3, tr * 0.15, 0, s * 0.02, tr * 1.25);
+  tg.addColorStop(0, shade(color, 75));
+  tg.addColorStop(1, shade(color, -40));
+  g.beginPath();
+  g.arc(0, s * 0.02, tr, 0, 7);
+  g.fillStyle = tg;
+  g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.4)';
+  g.lineWidth = 1;
+  g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.28)';
+  g.beginPath();
+  g.arc(tr * 0.3, s * 0.02 + tr * 0.3, tr * 0.28, 0, 7);
+  g.fill();
+
+  // спалах пострілу
+  if (o.flash > 0) {
+    const f = o.flash / 90;
+    g.save();
+    g.translate(0, -bl - 4);
+    g.globalAlpha = f;
+    g.fillStyle = '#fff7cc';
+    g.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      const rr = (i % 2 ? 4 : 12) * (0.5 + f * 0.7);
+      g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    g.closePath();
+    g.fill();
+    g.shadowColor = '#ffd23f';
+    g.shadowBlur = 14;
+    g.fillStyle = '#ffe680';
+    g.beginPath();
+    g.arc(0, 0, 4, 0, 7);
+    g.fill();
+    g.restore();
+    g.globalAlpha = 1;
+  }
 }
 
 function drawTank(t, color, isPlayer) {
@@ -742,7 +855,7 @@ function drawTank(t, color, isPlayer) {
   if (t.spawning > 0 && Math.floor(t.spawning / 100) % 2) { ctx.restore(); return; }
   if (isPlayer && player.invuln > 0 && Math.floor(player.invuln / 100) % 2) ctx.globalAlpha = 0.45;
   if (freezeTimer > 0 && !isPlayer) ctx.globalAlpha = 0.6;
-  drawTankShape(ctx, t.size, color, isPlayer ? '#eaffff' : '#f0f0f0');
+  drawTankShape(ctx, t.size, color, { tread: t.tread || 0, flash: t.flash || 0 });
   ctx.restore();
   ctx.globalAlpha = 1;
 
@@ -782,11 +895,30 @@ function draw() {
   for (const e of enemies) if (!e.dead) drawTank(e, e.color, false);
 
   for (const b of bullets) {
-    ctx.fillStyle = b.fromPlayer ? '#c8ffe0' : '#ffb0b8';
+    // світний трейл
+    const tg = ctx.createLinearGradient(b.x, b.y, b.x - b.dx * 16, b.y - b.dy * 16);
+    tg.addColorStop(0, b.fromPlayer ? 'rgba(57,255,136,.7)' : 'rgba(255,77,94,.7)');
+    tg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.strokeStyle = tg;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - b.dx * 16, b.y - b.dy * 16);
+    ctx.stroke();
+    // ядро снаряда
+    ctx.save();
     ctx.shadowColor = b.fromPlayer ? '#39ff88' : '#ff4d5e';
-    ctx.shadowBlur = 8;
-    ctx.fillRect(b.x - 4, b.y - 4, 8, 8);
-    ctx.shadowBlur = 0;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = b.fromPlayer ? '#8dffc0' : '#ff9aa5';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 4.5, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 2, 0, 7);
+    ctx.fill();
+    ctx.restore();
   }
 
   for (let r = 0; r < ROWS; r++)
@@ -989,7 +1121,7 @@ function drawPreview(st) {
   g.translate(pc.width / 2, pc.height / 2 + 6);
   g.rotate(Math.PI / 2);
   g.scale(1.6, 1.6);
-  drawTankShape(g, st.size, CLS_COLOR[st.cls], '#eaffff');
+  drawTankShape(g, st.size, CLS_COLOR[st.cls]);
   g.restore();
 }
 
