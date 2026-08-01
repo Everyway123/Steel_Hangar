@@ -10,36 +10,36 @@ const CLS_COLOR = { 'ЛТ': '#6fd3ff', 'СТ': '#39ff88', 'ВТ': '#ffd23f', 'П
 
 const TANKS = {
   // Розвідники (ЛТ)
-  kadet:    { name: 'Т-10 «Кадет»',      cls: 'ЛТ', tier: 1, hp: 12, dmg: 2,  fireCd: 550,  speed: 2.3,  armor: 0, bulletSpeed: 6.0,  size: 32,
+  kadet:    { name: 'Т-10 «Кадет»',      cls: 'ЛТ', tier: 1, hp: 12, dmg: 2,  fireCd: 550,  speed: 1.75,  armor: 0, bulletSpeed: 6.0,  size: 32,
               prev: null,       research: 0,     cost: 0,     desc: 'Навчальний танк. З нього починається кожен герой.' },
-  sokil:    { name: 'Т-25 «Сокіл»',      cls: 'ЛТ', tier: 2, hp: 15, dmg: 2,  fireCd: 420,  speed: 2.5,  armor: 0, bulletSpeed: 7.0,  size: 32,
+  sokil:    { name: 'Т-25 «Сокіл»',      cls: 'ЛТ', tier: 2, hp: 15, dmg: 2,  fireCd: 420,  speed: 2.2,  armor: 0, bulletSpeed: 7.0,  size: 32,
               prev: 'kadet',    research: 250,   cost: 600,   desc: 'Швидкий розвідник. Літає по карті, жалить і тікає.' },
-  pryvyd:   { name: 'Т-50 «Привид»',     cls: 'ЛТ', tier: 3, hp: 18, dmg: 3,  fireCd: 380,  speed: 2.8,  armor: 0, bulletSpeed: 7.5,  size: 32,
+  pryvyd:   { name: 'Т-50 «Привид»',     cls: 'ЛТ', tier: 3, hp: 18, dmg: 3,  fireCd: 380,  speed: 2.45,  armor: 0, bulletSpeed: 7.5,  size: 32,
               prev: 'sokil',    research: 700,   cost: 2000,  desc: 'Найшвидший танк гри. Вороги бачать лише пил.' },
   // Універсали (СТ)
-  veteran:  { name: 'Т-34 «Ветеран»',    cls: 'СТ', tier: 3, hp: 22, dmg: 3,  fireCd: 500,  speed: 1.9,  armor: 1, bulletSpeed: 7.0,  size: 34,
+  veteran:  { name: 'Т-34 «Ветеран»',    cls: 'СТ', tier: 3, hp: 22, dmg: 3,  fireCd: 500,  speed: 1.7,  armor: 1, bulletSpeed: 7.0,  size: 34,
               prev: 'sokil',    research: 600,   cost: 1800,  desc: 'Легендарний універсал. Надійний у будь-якій ситуації.' },
   bars:     { name: 'Т-44 «Барс»',       cls: 'СТ', tier: 4, hp: 28, dmg: 4,  fireCd: 480,  speed: 2.0,  armor: 1, bulletSpeed: 7.5,  size: 35,
               prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Швидкий, точний, злий. Танк для тих, хто все вміє.' },
-  shkval:   { name: 'Т-62 «Шквал»',      cls: 'СТ', tier: 5, hp: 36, dmg: 5,  fireCd: 460,  speed: 2.1,  armor: 2, bulletSpeed: 8.0,  size: 36,
+  shkval:   { name: 'Т-62 «Шквал»',      cls: 'СТ', tier: 5, hp: 36, dmg: 5,  fireCd: 460,  speed: 1.85,  armor: 2, bulletSpeed: 8.0,  size: 36,
               prev: 'bars',     research: 3000,  cost: 10000, desc: 'Вершина СТ: тисне темпом і не пробачає помилок.' },
   // Гілка важких (ВТ)
-  bastion:  { name: 'КВ-1 «Бастіон»',    cls: 'ВТ', tier: 4, hp: 34, dmg: 4,  fireCd: 620,  speed: 1.35, armor: 2, bulletSpeed: 7.0,  size: 38,
+  bastion:  { name: 'КВ-1 «Бастіон»',    cls: 'ВТ', tier: 4, hp: 34, dmg: 4,  fireCd: 620,  speed: 1.2, armor: 2, bulletSpeed: 7.0,  size: 38,
               prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Важка броня. Снаряди рикошетять, вороги плачуть.' },
-  molot:    { name: 'ІС-7 «Молот»',      cls: 'ВТ', tier: 5, hp: 48, dmg: 5,  fireCd: 660,  speed: 1.25, armor: 3, bulletSpeed: 7.5,  size: 40,
+  molot:    { name: 'ІС-7 «Молот»',      cls: 'ВТ', tier: 5, hp: 48, dmg: 5,  fireCd: 660,  speed: 1.1, armor: 3, bulletSpeed: 7.5,  size: 40,
               prev: 'bastion',  research: 3000,  cost: 10000, desc: 'Сталева фортеця на гусеницях. Але це ще не вершина...' },
-  mamont:   { name: 'КВ-5 «Мамонт»',     cls: 'ВТ', tier: 6, hp: 68, dmg: 6,  fireCd: 700,  speed: 1.15, armor: 4, bulletSpeed: 7.5,  size: 42,
+  mamont:   { name: 'КВ-5 «Мамонт»',     cls: 'ВТ', tier: 6, hp: 68, dmg: 6,  fireCd: 700,  speed: 1.0, armor: 4, bulletSpeed: 7.5,  size: 42,
               prev: 'molot',    research: 6500,  cost: 24000, desc: 'Ходяча стіна. Половина снарядів просто відскакує.' },
-  tytan:    { name: 'Об.705 «Титан»',    cls: 'ВТ', tier: 7, hp: 92, dmg: 7,  fireCd: 750,  speed: 1.05, armor: 5, bulletSpeed: 8.0,  size: 44,
+  tytan:    { name: 'Об.705 «Титан»',    cls: 'ВТ', tier: 7, hp: 92, dmg: 7,  fireCd: 750,  speed: 0.95, armor: 5, bulletSpeed: 8.0,  size: 44,
               prev: 'mamont',   research: 13000, cost: 50000, desc: 'Абсолютна вершина. Земля дрижить, вороги розбігаються.' },
   // Снайпери (ПТ-САУ)
-  osa:      { name: 'СУ-85 «Оса»',       cls: 'ПТ', tier: 4, hp: 18, dmg: 6,  fireCd: 850,  speed: 1.65, armor: 0, bulletSpeed: 9.0,  size: 34,
+  osa:      { name: 'СУ-85 «Оса»',       cls: 'ПТ', tier: 4, hp: 18, dmg: 6,  fireCd: 850,  speed: 1.45, armor: 0, bulletSpeed: 9.0,  size: 34,
               prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
-  kobra:    { name: 'ІСУ-152 «Кобра»',   cls: 'ПТ', tier: 5, hp: 24, dmg: 9,  fireCd: 980,  speed: 1.5,  armor: 1, bulletSpeed: 10.0, size: 36,
+  kobra:    { name: 'ІСУ-152 «Кобра»',   cls: 'ПТ', tier: 5, hp: 24, dmg: 9,  fireCd: 980,  speed: 1.3,  armor: 1, bulletSpeed: 10.0, size: 36,
               prev: 'osa',      research: 3000,  cost: 10000, desc: '«Бах» — і ворога більше немає.' },
-  skorpion: { name: 'СУ-100 «Скорпіон»', cls: 'ПТ', tier: 6, hp: 30, dmg: 12, fireCd: 1050, speed: 1.45, armor: 1, bulletSpeed: 10.5, size: 38,
+  skorpion: { name: 'СУ-100 «Скорпіон»', cls: 'ПТ', tier: 6, hp: 30, dmg: 12, fireCd: 1050, speed: 1.3, armor: 1, bulletSpeed: 10.5, size: 38,
               prev: 'kobra',    research: 6500,  cost: 24000, desc: 'Жало, що пробиває все. Навіть важкі бояться.' },
-  aspid:    { name: 'Об.268 «Аспід»',    cls: 'ПТ', tier: 7, hp: 38, dmg: 16, fireCd: 1150, speed: 1.35, armor: 2, bulletSpeed: 11.0, size: 40,
+  aspid:    { name: 'Об.268 «Аспід»',    cls: 'ПТ', tier: 7, hp: 38, dmg: 16, fireCd: 1150, speed: 1.2, armor: 2, bulletSpeed: 11.0, size: 40,
               prev: 'skorpion', research: 13000, cost: 50000, desc: 'Один постріл — один труп. Навіть боси здригаються.' },
 };
 const TREE_ORDER = ['kadet', 'sokil', 'pryvyd', 'veteran', 'bars', 'shkval',
@@ -280,10 +280,10 @@ const MAPS = [
 
 // ---------- Вороги ----------
 const ENEMY_TYPES = {
-  scout:   { hp: 4,  speed: 1.9, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff' },
-  soldier: { hp: 7,  speed: 1.25, size: 34, dmg: 2, fireCd: 1200, credits: 85,  xp: 17, color: '#ff9d5c' },
-  heavy:   { hp: 14, speed: 0.85, size: 36, dmg: 3, fireCd: 1100, credits: 140, xp: 28, color: '#e06666' },
-  boss:    { hp: 80, speed: 0.8, size: 48, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
+  scout:   { hp: 4,  speed: 1.65, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff' },
+  soldier: { hp: 7,  speed: 1.1, size: 34, dmg: 2, fireCd: 1200, credits: 85,  xp: 17, color: '#ff9d5c' },
+  heavy:   { hp: 14, speed: 0.75, size: 36, dmg: 3, fireCd: 1100, credits: 140, xp: 28, color: '#e06666' },
+  boss:    { hp: 80, speed: 0.7, size: 48, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
 };
 
 function buildRoster(tier, elite) {
@@ -304,31 +304,31 @@ function buildRoster(tier, elite) {
 // рідкісні — сила за ціну слабкості, епічні — лише в елітних боях.
 const SUPPLY_MS = 45000;
 const PERKS = [
-  // звичайні
-  { id: 'cal',    rar: 'common', ico: '💥', name: 'Калібровка',       desc: '+15% урону',
-    apply: p => p.dmg *= 1.15 },
-  { id: 'oil',    rar: 'common', ico: '🔫', name: 'Мастило затвора',  desc: 'Перезарядка на 12% швидша',
-    apply: p => p.fireCd = Math.round(p.fireCd * 0.88) },
-  { id: 'track',  rar: 'common', ico: '🏎', name: 'Нова ходова',      desc: '+12% швидкості',
-    apply: p => p.speed *= 1.12 },
-  { id: 'plate',  rar: 'common', ico: '🛡', name: 'Броньовий лист',   desc: '+1 броня',
-    apply: p => p.armor += 1 },
-  // рідкісні — сила за ціну
-  { id: 'sharp',  rar: 'rare', ico: '⚔', name: 'Гостре дуло',        desc: '+40% урону, але −10% швидкості',
-    apply: p => { p.dmg *= 1.4; p.speed *= 0.9; } },
-  { id: 'turbo',  rar: 'rare', ico: '🔥', name: 'Турбіна',            desc: '+30% швидкості, але −1 броня',
-    apply: p => { p.speed *= 1.3; p.armor = Math.max(0, p.armor - 1); } },
-  { id: 'screen', rar: 'rare', ico: '🧱', name: 'Композитні екрани',  desc: '+2 броні, але перезарядка на 15% довша',
-    apply: p => { p.armor += 2; p.fireCd = Math.round(p.fireCd * 1.15); } },
-  { id: 'rammer', rar: 'rare', ico: '⚙', name: 'Досилач',            desc: 'Перезарядка на 25% швидша, але −10% урону',
-    apply: p => { p.fireCd = Math.round(p.fireCd * 0.75); p.dmg *= 0.9; } },
-  // епічні — лише в елітних боях, кожен один раз
-  { id: 'double', rar: 'epic', ico: '🎯', name: 'Здвоєна гармата',    desc: 'Кожен постріл — ДВА снаряди віялом', unique: true,
+  // польові — прості, але відчутні
+  { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+40% срібла за кожен фраг до кінця бою',
+    apply: p => battle.lootMult = (battle.lootMult || 1) * 1.4 },
+  { id: 'cryo',    rar: 'common', ico: '❄', name: 'Кріо-снаряди',      desc: 'Твої влучання ЗАМОРОЖУЮТЬ ворога на 2 с',
+    apply: p => p.cryo = true },
+  { id: 'forsazh', rar: 'common', ico: '🚀', name: 'Форсаж',            desc: '+25% швидкості — літай між укриттями',
+    apply: p => p.speed *= 1.25 },
+  { id: 'kalibr',  rar: 'common', ico: '💥', name: 'Великий калібр',    desc: '+20% урону — снаряди б\'ють гучніше',
+    apply: p => p.dmg *= 1.2 },
+  // тактичні — міняють стиль гри
+  { id: 'trofey',  rar: 'rare', ico: '🔧', name: 'Трофейщик',          desc: 'Кожен фраг ЛІКУЄ тебе на 2 HP',
+    apply: p => p.vampire = true },
+  { id: 'taran',   rar: 'rare', ico: '🥊', name: 'Таран',              desc: 'Твій корпус — зброя: зіткнення б\'є ворога на 6',
+    apply: p => p.ram = true },
+  { id: 'reactive', rar: 'rare', ico: '🛡', name: 'Реактивна броня',   desc: '+1 броня, рикошет ВІДБИВАЄ снаряд у ворога',
+    apply: p => { p.armor += 1; p.reflect = true; } },
+  { id: 'zatvor',  rar: 'rare', ico: '⚡', name: 'Блискавичний затвор', desc: 'Перезарядка на 30% швидша',
+    apply: p => p.fireCd = Math.round(p.fireCd * 0.7) },
+  // епічні — лише в елітних боях, кожна один раз
+  { id: 'double', rar: 'epic', ico: '🎯', name: 'Здвоєна гармата',     desc: 'Кожен постріл — ДВА снаряди віялом', unique: true,
     apply: p => p.doubleShot = true },
-  { id: 'heat',   rar: 'epic', ico: '☄', name: 'Фугасні снаряди',    desc: 'Влучання вибухає й ранить ворогів поруч', unique: true,
+  { id: 'heat',   rar: 'epic', ico: '☄', name: 'Фугасні снаряди',     desc: 'Влучання ВИБУХАЄ і ранить ворогів поруч', unique: true,
     apply: p => p.explosiveRounds = true },
-  { id: 'crew',   rar: 'epic', ico: '👥', name: 'Бойовий розрахунок', desc: 'Перезарядка на 35% швидша', unique: true,
-    apply: p => p.fireCd = Math.round(p.fireCd * 0.65) },
+  { id: 'smoke',  rar: 'epic', ico: '👻', name: 'Димова завіса',       desc: 'Після влучання по тобі — 2 с повної невразливості', unique: true,
+    apply: p => p.smoke = true },
 ];
 
 // швидкість розгону: важкий танк набирає хід повільно — відчувається вага
@@ -345,6 +345,7 @@ const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 let grid, gridHp, player, enemies, bullets, particles, drops;
+let touchMode = false; // на тачі стрілок нема — там лишається автоприціл
 let spawnQueue, spawnPoints, spawnTimer, maxAlive;
 let battle; // статистика поточного бою
 let state = 'hangar';
@@ -438,11 +439,7 @@ function startBattle() {
   document.getElementById('resultOverlay').classList.add('hidden');
   document.getElementById('perkOverlay').classList.add('hidden');
   document.body.classList.add('inBattle');
-  document.getElementById('uiTankName').textContent = st.name + (elite ? ' ☠' : '');
-  document.getElementById('uiObjective').textContent = battle.mode === 'assault'
-    ? '🎯 Ціль: знищ ворожий ШТАБ! Вороги прибуватимуть нескінченно.'
-    : '🎯 Ціль: знищ усі ворожі танки.';
-  document.getElementById('perkList').textContent = '';
+  battle.introT = 3200; // вступний банер з ціллю бою
 
   state = 'play';
   lastTime = performance.now();
@@ -573,14 +570,14 @@ function shoot(tank, isPlayer) {
     // вороги стріляють у гравця з невеликим розкидом
     const ang = Math.atan2(player.y - tank.y, player.x - tank.x) + (Math.random() - 0.5) * 0.24;
     tank.turretAngle = ang;
-    fireBullet(tank, ang, 3.9, tank.dmg, false);
+    fireBullet(tank, ang, 3.6, tank.dmg, false);
   }
 }
 function bossSpreadShot(boss) {
   const ang = Math.atan2(player.y - boss.y, player.x - boss.x);
   boss.turretAngle = ang;
   for (const a of [ang - 0.35, ang, ang + 0.35]) {
-    fireBullet(boss, a, 3.9, boss.dmg, false);
+    fireBullet(boss, a, 3.6, boss.dmg, false);
   }
 }
 
@@ -597,7 +594,7 @@ function trySpawnEnemy(dt) {
   if (enemies.length >= maxAlive) return;
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
-  spawnTimer = 1500;
+  spawnTimer = 1800;
   const pt = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
   const e = scaledEnemy(spawnQueue.shift(), battle.tank.tier);
   // великі танки притискаємо всередину поля, щоб не застрягали біля краю
@@ -627,7 +624,8 @@ function updateEnemy(e, dt) {
     }
   }
   if (e.flash > 0) e.flash -= dt;
-  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.55 : 1);
+  if (e.slowT > 0) e.slowT -= dt;
+  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.55 : 1) * (e.slowT > 0 ? 0.55 : 1);
   if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
   else e.tread = (e.tread || 0) + eSpeed;
 
@@ -710,6 +708,7 @@ function updateBullets(dt) {
           b.dead = true;
           e.hp -= b.dmg;
           battle.dmgDealt += b.dmg;
+          if (player.cryo) e.slowT = 2000; // кріо-снаряди
           sfx.hit();
           spawnParticles(b.x, b.y, e.color, 5);
           // фугасні снаряди: вибух зачіпає ворогів поруч
@@ -739,11 +738,18 @@ function updateBullets(dt) {
         sfx.rico();
         floatText(player.x, player.y - 24, 'РИКОШЕТ!', '#ffd23f');
         spawnParticles(b.x, b.y, '#ffd23f', 4);
+        // реактивна броня: снаряд летить назад у кривдника
+        if (player.reflect) {
+          bullets.push({
+            x: b.x, y: b.y, dx: -b.dx, dy: -b.dy,
+            speed: 6, dmg: Math.max(1, player.dmg * 0.6), fromPlayer: true,
+          });
+        }
       } else {
         const dmg = Math.max(1, Math.round(b.dmg - player.armor * 0.7));
         player.hp -= dmg;
         battle.dmgTaken += dmg;
-        player.invuln = 600; // коротка невразливість, щоб не вбивали залпом
+        player.invuln = player.smoke ? 2000 : 600; // димова завіса подовжує невразливість
         shakeTime = 180;
         sfx.hit();
         floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
@@ -823,9 +829,10 @@ function killEnemy(e) {
   // анти-ферма: у штурмі після 20 фрагів нагорода за фраги вичерпана
   const farmed = battle.mode === 'assault' && battle.frags > 30;
   if (!farmed) {
-    battle.credits += e.credits;
+    const loot = Math.round(e.credits * (battle.lootMult || 1));
+    battle.credits += loot;
     battle.xp += e.xpVal;
-    floatText(e.x, e.y, `+${e.credits} 🪙`, '#ffd23f');
+    floatText(e.x, e.y, `+${loot} 🪙`, '#ffd23f');
   } else {
     if (!battle.farmWarned) {
       battle.farmWarned = true;
@@ -834,6 +841,11 @@ function killEnemy(e) {
     floatText(e.x, e.y, '+0 🪙', '#7a8aa8');
   }
   if (e.type === 'boss') battle.bossKilled = true;
+  // трофейщик: фраги лікують
+  if (player.vampire && player.hp > 0) {
+    player.hp = Math.min(player.maxHp, player.hp + 2);
+    floatText(player.x, player.y - 30, '+2 HP', '#39ff88');
+  }
 
   const roll = Math.random();
   if (roll < 0.10) drops.push({ x: e.x, y: e.y, kind: 'med', ttl: 9000 });
@@ -904,7 +916,7 @@ function openPerkMenu() {
   if (state === 'perk') return;
   showPerkCards();
 }
-const RAR_LABEL = { common: '', rare: 'РІДКІСНА', epic: '★ ЕПІЧНА ★' };
+const RAR_LABEL = { common: 'ПОЛЬОВА', rare: 'ТАКТИЧНА', epic: '★ ЕПІЧНА ★' };
 
 function showPerkCards() {
   state = 'perk';
@@ -947,8 +959,7 @@ function pickPerk(u) {
   pendingPerks--;
   if (pendingPerks > 0) { showPerkCards(); return; }
   document.getElementById('perkOverlay').classList.add('hidden');
-  document.getElementById('perkList').innerHTML =
-    'Бонуси бою: ' + battle.perks.map(p => p.ico + ' ' + p.name).join(', ');
+  floatText(player.x, player.y - 34, u.ico + ' ' + u.name.toUpperCase() + '!', '#ffd23f');
   state = 'play';
   player.invuln = Math.max(player.invuln, 700);
   lastTime = performance.now();
@@ -1021,16 +1032,72 @@ function updatePlayer(dt) {
   const dist = player.speed * sandMult * accel * dt / 16.67;
   if (dir && moveTank(player, dir, dist)) player.tread = (player.tread || 0) + dist;
 
-  // автоприціл: найближчий видимий ворог, у штурмі — ще й штаб
-  const target = nearestTarget();
-  player.turretAngle = target
-    ? Math.atan2(target.y - player.y, target.x - player.x)
-    : DIR_ANGLE[player.dir];
+  // прицілювання: стрілки задають напрямок вогню (8 напрямків, з діагоналями),
+  // гра лише м'яко «доводить» ствол до ворога в межах ±20° від ТВОГО напрямку
+  const ax = (keys.aimRight ? 1 : 0) - (keys.aimLeft ? 1 : 0);
+  const ay = (keys.aimDown ? 1 : 0) - (keys.aimUp ? 1 : 0);
+  let wantFire = false;
+  if (ax || ay) {
+    player.turretAngle = coneAssist(Math.atan2(ay, ax));
+    wantFire = true;
+    touchMode = false;
+  } else if (keys.fire) {
+    // пробіл — вогонь по ходу корпусу; на тачі — автоприціл (немає стрілок)
+    player.turretAngle = touchMode ? autoAngle() : coneAssist(DIR_ANGLE[player.dir]);
+    wantFire = true;
+  } else {
+    player.turretAngle = DIR_ANGLE[player.dir]; // башта дивиться по ходу
+  }
 
-  if (keys.fire && player.cooldown <= 0) {
+  if (wantFire && player.cooldown <= 0) {
     shoot(player, true);
     player.cooldown = player.fireCd;
   }
+
+  // таран: корпус б'є ворогів при зіткненні
+  if (player.ram) {
+    player.ramCd = (player.ramCd || 0) - dt;
+    if (player.ramCd <= 0) {
+      for (const e of enemies) {
+        if (e.dead || e.spawning > 0) continue;
+        if (Math.abs(e.x - player.x) < (e.size + player.size) / 2 + 5 &&
+            Math.abs(e.y - player.y) < (e.size + player.size) / 2 + 5) {
+          e.hp -= 6;
+          battle.dmgDealt += 6;
+          player.ramCd = 1000;
+          shakeTime = 150;
+          sfx.boom();
+          spawnParticles((e.x + player.x) / 2, (e.y + player.y) / 2, '#ffd23f', 10);
+          floatText(e.x, e.y - 20, '🥊 ТАРАН!', '#ff9d5c');
+          if (e.hp <= 0) killEnemy(e);
+          break;
+        }
+      }
+    }
+  }
+}
+
+// доведення в конусі: якщо в межах ±20° від обраного напрямку є видимий ворог —
+// ствол чіпляється за нього; якщо ні — стріляємо рівно куди натиснуто
+function coneAssist(base) {
+  let best = base, bestDiff = 0.35;
+  const consider = (x, y) => {
+    if (Math.hypot(x - player.x, y - player.y) > 500) return;
+    const ang = Math.atan2(y - player.y, x - player.x);
+    const diff = Math.abs(((ang - base + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    if (diff < bestDiff && hasLOS(player.x, player.y, x, y)) { bestDiff = diff; best = ang; }
+  };
+  for (const e of enemies) if (!e.dead && !(e.spawning > 0)) consider(e.x, e.y);
+  if (battle.mode === 'assault') {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+      if (grid[r][c] === T_HQ) consider(c * TILE + TILE / 2, r * TILE + TILE / 2);
+  }
+  return best;
+}
+
+function autoAngle() {
+  const t = nearestTarget();
+  return t ? Math.atan2(t.y - player.y, t.x - player.x) : DIR_ANGLE[player.dir];
 }
 
 function nearestTarget() {
@@ -1318,7 +1385,7 @@ function drawTank(t, color, isPlayer) {
     ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
     ctx.fillRect(t.x - w / 2, t.y - t.size / 2 - 10, w * frac, 5);
   }
-  if (freezeTimer > 0 && !isPlayer) {
+  if ((freezeTimer > 0 || t.slowT > 0) && !isPlayer) {
     ctx.font = '14px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('❄', t.x, t.y - t.size / 2 - 14);
@@ -1405,17 +1472,100 @@ function draw() {
     ctx.globalAlpha = 1;
   }
   ctx.restore();
+  drawHud(); // поверх усього, без тремтіння екрана
 }
 
-function updateBattleHud() {
-  document.getElementById('uiFrags').textContent = battle.frags;
-  document.getElementById('uiEnemies').textContent = battle.mode === 'assault'
-    ? '∞ (штаб: ' + battle.hqLeft + ')'
-    : spawnQueue.length + enemies.filter(e => !e.dead).length;
-  document.getElementById('uiRico').textContent = battle.ricochets;
-  document.getElementById('hpBar').style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
-  document.getElementById('perkBar').style.width = Math.min(100, battle.supply / SUPPLY_MS * 100) + '%';
-  document.getElementById('uiMed').textContent = battle.medkit ? '✅ готова' : '— використана';
+// HUD малюється прямо на полі бою — все в одному екрані
+function drawHud() {
+  if (!battle) return;
+  ctx.save();
+  ctx.textBaseline = 'middle';
+
+  // верхня панель
+  ctx.fillStyle = 'rgba(5,7,12,.8)';
+  ctx.fillRect(0, 0, W, 36);
+  ctx.font = 'bold 15px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffd23f';
+  const left = battle.mode === 'assault'
+    ? `🎯 ШТАБ: ${battle.hqLeft}`
+    : `🎯 ${spawnQueue.length + enemies.filter(e => !e.dead).length}`;
+  ctx.fillText(`⚔ ${battle.frags}   ${left}`, 12, 19);
+
+  // центр: таймер постачання
+  const msLeft = Math.max(0, SUPPLY_MS - battle.supply);
+  const sec = Math.ceil(msLeft / 1000);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = sec <= 5 ? '#39ff88' : '#8fa2c4';
+  ctx.fillText(`📦 доктрина за ${sec}с`, W / 2, 19);
+
+  // праворуч: аптечка
+  ctx.textAlign = 'right';
+  ctx.fillStyle = battle.medkit ? '#39ff88' : '#3a4661';
+  ctx.fillText(battle.medkit ? '🔧 аптечка [E]' : '🔧 —', W - 12, 19);
+
+  // взяті доктрини — іконки під панеллю
+  if (battle.perks.length) {
+    ctx.textAlign = 'left';
+    ctx.font = '17px monospace';
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText(battle.perks.map(p => p.ico).join(' '), 12, 52);
+  }
+
+  // нижня панель: HP
+  ctx.fillStyle = 'rgba(5,7,12,.8)';
+  ctx.fillRect(0, H - 28, W, 28);
+  const frac = Math.max(0, player.hp / player.maxHp);
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(10, H - 20, W - 20, 12);
+  ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
+  ctx.fillRect(10, H - 20, (W - 20) * frac, 12);
+  ctx.strokeStyle = '#263149';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(10, H - 20, W - 20, 12);
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#05070c';
+  ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, W / 2, H - 14);
+
+  // великий відлік перед постачанням
+  if (sec <= 5 && msLeft > 0 && state === 'play') {
+    const pulse = 1 - (msLeft % 1000) / 1000;
+    ctx.font = `bold ${Math.round(38 + pulse * 14)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.5 + pulse * 0.5;
+    ctx.fillStyle = '#ffd23f';
+    ctx.shadowColor = '#ffd23f';
+    ctx.shadowBlur = 18;
+    ctx.fillText(`📦 ${sec}`, W / 2, 100);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  // вступний банер з ціллю
+  if (battle.introT > 0) {
+    const a = Math.min(1, battle.introT / 700);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(5,7,12,.75)';
+    ctx.fillRect(0, H / 2 - 58, W, 116);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = battle.mode === 'assault' ? '#ff4d5e' : '#39ff88';
+    ctx.font = 'bold 26px monospace';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 16;
+    ctx.fillText(battle.mode === 'assault' ? '☭ ЗНИЩ ВОРОЖИЙ ШТАБ!' : '⚔ ЗНИЩ УСІ ТАНКИ!', W / 2, H / 2 - 16);
+    ctx.shadowBlur = 0;
+    ctx.font = '15px monospace';
+    ctx.fillStyle = '#d7e0f0';
+    ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ ×2' : ''), W / 2, H / 2 + 16);
+    if (battle.mode === 'assault') {
+      ctx.fillStyle = '#8fa2c4';
+      ctx.font = '13px monospace';
+      ctx.fillText('Вороги нескінченні — прорвися і знеси штаб', W / 2, H / 2 + 40);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
 }
 
 // ---------- Ігровий цикл ----------
@@ -1428,11 +1578,18 @@ function loop(now) {
   if (shakeTime > 0) shakeTime -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
   battle.gameMs += dt;
+  if (battle.introT > 0) battle.introT -= dt;
 
-  // постачання доктрин раз на ~55 секунд
+  // постачання доктрин раз на ~45 секунд, з відліком-попередженням
   battle.supply += dt;
+  const supplySec = Math.ceil((SUPPLY_MS - battle.supply) / 1000);
+  if (supplySec <= 5 && supplySec >= 1 && supplySec !== battle.lastTick) {
+    battle.lastTick = supplySec;
+    beep(500 + (5 - supplySec) * 80, 0.08, 'sine', 0.06);
+  }
   if (battle.supply >= SUPPLY_MS) {
     battle.supply = 0;
+    battle.lastTick = 0;
     pendingPerks++;
     sfx.perk();
     openPerkMenu();
@@ -1449,7 +1606,6 @@ function loop(now) {
   updateDrops(dt);
   updateParticles(dt);
   draw();
-  updateBattleHud();
 }
 
 // ============================================================
@@ -1627,11 +1783,10 @@ function flashMsg(text) {
 }
 
 // ---------- Ввід ----------
+// WASD — рух корпусу; СТРІЛКИ — вогонь у напрямку (twin-stick без мишки)
 const KEYMAP = {
-  ArrowUp: 'up', KeyW: 'up',
-  ArrowDown: 'down', KeyS: 'down',
-  ArrowLeft: 'left', KeyA: 'left',
-  ArrowRight: 'right', KeyD: 'right',
+  KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
+  ArrowUp: 'aimUp', ArrowDown: 'aimDown', ArrowLeft: 'aimLeft', ArrowRight: 'aimRight',
   Space: 'fire',
 };
 
@@ -1685,7 +1840,7 @@ for (const btn of document.querySelectorAll('#dpad .tbtn')) {
   btn.addEventListener('touchend', e => { e.preventDefault(); keys[dir] = false; }, { passive: false });
 }
 const fireBtn = document.getElementById('fireBtn');
-fireBtn.addEventListener('touchstart', e => { e.preventDefault(); keys.fire = true; }, { passive: false });
+fireBtn.addEventListener('touchstart', e => { e.preventDefault(); keys.fire = true; touchMode = true; }, { passive: false });
 fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = false; }, { passive: false });
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
 
