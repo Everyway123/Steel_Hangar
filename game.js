@@ -114,7 +114,7 @@ function logEvent(type, data) {
   try {
     const arr = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
     arr.push(Object.assign({ t: type, ts: Date.now() }, data));
-    while (arr.length > 300) arr.shift();
+    while (arr.length > 500) arr.shift();
     localStorage.setItem(LOG_KEY, JSON.stringify(arr));
   } catch (e) {}
 }
@@ -2148,6 +2148,59 @@ function renderHangar() {
   }
 
   renderTankDetail();
+  renderAnalytics();
+}
+
+// ---------- Аналітика: сама рахує статистику з локального логу ----------
+function renderAnalytics() {
+  const box = document.getElementById('statsContent');
+  const ends = getLog().filter(e => e.t === 'battle_end');
+  if (!ends.length) {
+    box.innerHTML = '<p style="color:var(--dim);font-size:12px">Зіграй перший бій — і тут з\'явиться твоя статистика: вінрейт, улюблені танки, доктрини, динаміка.</p>';
+    return;
+  }
+  const wins = ends.filter(e => e.victory).length;
+  const avg = f => Math.round(ends.reduce((s, e) => s + (e[f] || 0), 0) / ends.length);
+  const last10 = ends.slice(-10);
+  const w10 = last10.filter(e => e.victory).length;
+
+  // по танках
+  const byTank = {};
+  for (const e of ends) {
+    const b = byTank[e.tank] = byTank[e.tank] || { n: 0, w: 0 };
+    b.n++; if (e.victory) b.w++;
+  }
+  const tankRows = Object.entries(byTank)
+    .sort((a, b) => b[1].n - a[1].n).slice(0, 5)
+    .map(([id, s]) => `<div class="statRow"><span>${(TANKS[id] || { name: id }).name}</span><span class="val">${s.w}/${s.n} (${Math.round(s.w / s.n * 100)}%)</span></div>`)
+    .join('');
+
+  // улюблені доктрини
+  const perkCount = {};
+  for (const e of getLog().filter(e => e.t === 'perk')) perkCount[e.id] = (perkCount[e.id] || 0) + 1;
+  const topPerks = Object.entries(perkCount).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([id, n]) => {
+      const p = PERKS.find(p => p.id === id);
+      return (p ? p.ico + ' ' + p.name : id) + ' ×' + n;
+    }).join(' · ') || '—';
+
+  // останні бої
+  const recent = ends.slice(-5).reverse().map(e =>
+    `<div style="font-size:11px;color:${e.victory ? 'var(--neon)' : 'var(--danger)'}">${e.victory ? '🏆' : '💥'} ${(TANKS[e.tank] || { name: e.tank }).name} · ${e.map} · ${e.sec}с · ${e.frags} фрагів</div>`
+  ).join('');
+
+  box.innerHTML = `
+    <div class="statRow"><span>Боїв у логу</span><span class="val">${ends.length}</span></div>
+    <div class="statRow"><span>Вінрейт</span><span class="val">${Math.round(wins / ends.length * 100)}% (останні ${last10.length}: ${Math.round(w10 / last10.length * 100)}%)</span></div>
+    <div class="statRow"><span>Сер. бій</span><span class="val">${avg('sec')}с</span></div>
+    <div class="statRow"><span>Сер. фраги / отримано</span><span class="val">${avg('frags')} / ${avg('taken')}</span></div>
+    <div class="statRow"><span>Рикошетів всього</span><span class="val">${ends.reduce((s, e) => s + (e.rico || 0), 0)}</span></div>
+    <div class="branchLabel">Танки (вінрейт)</div>
+    ${tankRows}
+    <div class="branchLabel">Улюблені доктрини</div>
+    <div style="font-size:11px;color:var(--gold)">${topPerks}</div>
+    <div class="branchLabel">Останні бої</div>
+    ${recent}`;
 }
 
 function tankNodeClick(id) {
@@ -2323,6 +2376,17 @@ document.getElementById('logBtn').onclick = async () => {
   const log = getLog();
   if (!log.length) { flashMsg('Лог порожній — зіграй хоча б один бій!'); return; }
   const text = JSON.stringify(log);
+  // на claude.ai — нативне збереження файлу; інакше буфер обміну або файл
+  if (window.claude && window.claude.downloads) {
+    try {
+      await window.claude.downloads.save({ filename: 'steel-hangar-log.json', data: text });
+      flashMsg(`📊 Лог збережено файлом (${log.length} подій) — кинь його в чат для аналізу!`);
+      return;
+    } catch (e) {
+      if (e && e.code === 'declined') return;
+      // інші помилки — падаємо на запасні варіанти
+    }
+  }
   try {
     await navigator.clipboard.writeText(text);
     flashMsg(`📊 Лог скопійовано (${log.length} подій) — встав його в чат для аналізу!`);
