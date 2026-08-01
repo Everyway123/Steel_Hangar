@@ -310,10 +310,11 @@ function frontBonus() { return 0.02 * Math.max(0, (save.front.liberated.length -
 
 // ---------- Вороги ----------
 const ENEMY_TYPES = {
-  scout:   { hp: 4,  speed: 1.65, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff' },
-  soldier: { hp: 7,  speed: 1.1, size: 34, dmg: 2, fireCd: 1200, credits: 85,  xp: 17, color: '#ff9d5c' },
-  heavy:   { hp: 14, speed: 0.75, size: 36, dmg: 3, fireCd: 1100, credits: 140, xp: 28, color: '#e06666' },
-  boss:    { hp: 80, speed: 0.7, size: 48, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
+  scout:   { hp: 4,  speed: 1.65, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff', cls: 'ЛТ' },
+  soldier: { hp: 7,  speed: 1.1, size: 34, dmg: 2, fireCd: 1200, credits: 85,  xp: 17, color: '#ff9d5c', cls: 'СТ' },
+  heavy:   { hp: 14, speed: 0.75, size: 36, dmg: 3, fireCd: 1100, credits: 140, xp: 28, color: '#e06666', cls: 'ВТ' },
+  rocket:  { hp: 6,  speed: 0.95, size: 34, dmg: 3, fireCd: 2800, credits: 170, xp: 32, color: '#ffd23f', cls: 'ПТ', homing: true },
+  boss:    { hp: 80, speed: 0.7, size: 48, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e', cls: 'ВТ' },
 };
 
 function buildRoster(tier, elite) {
@@ -322,8 +323,8 @@ function buildRoster(tier, elite) {
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
-    else if (tier === 3) pool.push(r < 0.35 ? 'scout' : r < 0.8 ? 'soldier' : 'heavy');
-    else pool.push(r < 0.2 ? 'scout' : r < 0.55 ? 'soldier' : 'heavy');
+    else if (tier === 3) pool.push(r < 0.3 ? 'scout' : r < 0.72 ? 'soldier' : r < 0.88 ? 'heavy' : 'rocket');
+    else pool.push(r < 0.18 ? 'scout' : r < 0.5 ? 'soldier' : r < 0.85 ? 'heavy' : 'rocket');
   }
   if (elite) pool.push('boss');
   return pool;
@@ -359,6 +360,8 @@ const PERKS = [
     apply: p => p.explosiveRounds = true },
   { id: 'smoke',  rar: 'epic', ico: '👻', name: 'Димова завіса',       desc: 'Після влучання по тобі — 2 с повної невразливості', unique: true,
     apply: p => p.smoke = true },
+  { id: 'homing', rar: 'epic', ico: '🛰', name: 'Самонавідні ракети',  desc: 'Твої снаряди САМІ шукають ціль і довертають', unique: true,
+    apply: p => p.homingRounds = true },
 ];
 
 // швидкість розгону: важкий танк набирає хід повільно — відчувається вага
@@ -600,6 +603,7 @@ function startBattle(sector) {
   keys = {};
 
   document.getElementById('hangarView').classList.add('hidden');
+  document.getElementById('frontView').classList.add('hidden');
   document.getElementById('battleView').classList.remove('hidden');
   document.getElementById('resultOverlay').classList.add('hidden');
   document.getElementById('perkOverlay').classList.add('hidden');
@@ -726,11 +730,12 @@ function fireBullet(tank, ang, speed, dmg, fromPlayer, overWalls) {
 
 function shoot(tank, isPlayer) {
   if (isPlayer) {
-    if (player.doubleShot) {
-      fireBullet(tank, player.turretAngle - 0.07, player.bulletSpeed, player.dmg, true);
-      fireBullet(tank, player.turretAngle + 0.07, player.bulletSpeed, player.dmg, true);
-    } else {
-      fireBullet(tank, player.turretAngle, player.bulletSpeed, player.dmg, true);
+    const angles = player.doubleShot
+      ? [player.turretAngle - 0.07, player.turretAngle + 0.07]
+      : [player.turretAngle];
+    for (const a of angles) {
+      fireBullet(tank, a, player.homingRounds ? player.bulletSpeed * 0.8 : player.bulletSpeed, player.dmg, true);
+      if (player.homingRounds) bullets[bullets.length - 1].homing = 'enemy';
     }
   } else {
     // вороги стріляють у гравця з невеликим розкидом
@@ -795,15 +800,28 @@ function updateEnemy(e, dt) {
   if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
   else e.tread = (e.tread || 0) + eSpeed;
 
-  // башта завжди дивиться на гравця
-  e.turretAngle = Math.atan2(player.y - e.y, player.x - e.x);
+  // башта дивиться по ходу корпусу — чесно, як у гравця
+  e.turretAngle = DIR_ANGLE[e.dir];
 
-  // стріляє лише коли реально бачить гравця (можна ховатися за стінами!)
+  // стріляє за тими ж правилами, що й ти: тільки по ходу корпусу (конус ±20°),
+  // тільки коли бачить. Ракетник — виняток: пускає самонавідні ракети
   e.cooldown -= dt;
   if (e.cooldown <= 0) {
     const range = battle.mod === 'fog' ? 280 : 460; // у тумані бачать гірше
     const dist = Math.hypot(player.x - e.x, player.y - e.y);
-    if (dist < range && hasLOS(e.x, e.y, player.x, player.y)) {
+    const angP = Math.atan2(player.y - e.y, player.x - e.x);
+    const facing = DIR_ANGLE[e.dir];
+    const diff = Math.abs(((angP - facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    const los = dist < range && hasLOS(e.x, e.y, player.x, player.y);
+
+    if (e.homing && los) {
+      // ракетник: повільна самонавідна ракета — ухиляйся або збивай!
+      e.turretAngle = angP;
+      fireBullet(e, facing, 3.0, e.dmg, false);
+      bullets[bullets.length - 1].homing = 'player';
+      e.cooldown = e.fireCd + Math.random() * 600;
+    } else if (los && diff < 0.35) {
+      e.turretAngle = angP;
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
       e.cooldown = e.fireCd + Math.random() * 400;
     } else if (dist < range && battle.idle > 10000) {
@@ -827,6 +845,34 @@ function updateBullets(dt) {
   const step = dt / 16.67;
   for (const b of bullets) {
     if (b.dead) continue;
+
+    // самонавідні ракети: плавно довертають до цілі, живуть 4.5 с
+    if (b.homing) {
+      b.life = (b.life === undefined ? 4500 : b.life) - dt;
+      if (b.life <= 0) { b.dead = true; spawnParticles(b.x, b.y, '#ffd23f', 6); continue; }
+      let tx = null, ty = null;
+      if (b.homing === 'player') { tx = player.x; ty = player.y; }
+      else {
+        let bd = 1e9;
+        for (const e of enemies) {
+          if (e.dead || e.spawning > 0) continue;
+          const d = Math.hypot(e.x - b.x, e.y - b.y);
+          if (d < bd) { bd = d; tx = e.x; ty = e.y; }
+        }
+      }
+      if (tx !== null) {
+        const want = Math.atan2(ty - b.y, tx - b.x);
+        const cur = Math.atan2(b.dy, b.dx);
+        let d = ((want - cur + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        const maxTurn = 0.055 * step;
+        const na = cur + Math.max(-maxTurn, Math.min(maxTurn, d));
+        b.dx = Math.cos(na); b.dy = Math.sin(na);
+      }
+      if (Math.random() < 0.5) {
+        particles.push({ x: b.x - b.dx * 8, y: b.y - b.dy * 8, vx: (Math.random() - 0.5), vy: (Math.random() - 0.5), life: 250, color: b.homing === 'player' ? '#ff9d3c' : '#7ef0ff' });
+      }
+    }
+
     b.x += b.dx * b.speed * step;
     b.y += b.dy * b.speed * step;
     if (b.x < 0 || b.y < 0 || b.x > W || b.y > H) { b.dead = true; continue; }
@@ -1597,41 +1643,94 @@ function drawHull(g, s, color, o = {}) {
 }
 
 function drawTurretGun(g, s, color, o = {}) {
+  const cls = o.cls || 'СТ';
+  // довжина і товщина дула — характер класу
+  const bl = cls === 'ПТ' ? s * 0.85 : cls === 'ВТ' ? s * 0.62 : s * 0.7;
+  const bw = cls === 'ВТ' ? 3.4 : cls === 'ПТ' ? 2.9 : 2.3;
+
   // маска гармати
   g.fillStyle = shade(color, -70);
   g.beginPath();
-  g.roundRect(-4.5, -s * 0.3, 9, s * 0.18, 2);
+  g.roundRect(-bw - 2, -s * 0.3, (bw + 2) * 2, s * 0.18, 2);
   g.fill();
 
   // дуло з металевим градієнтом і дульним гальмом
-  const bl = s * 0.68;
-  const bgrad = g.createLinearGradient(-3, 0, 3, 0);
+  const bgrad = g.createLinearGradient(-bw, 0, bw, 0);
   bgrad.addColorStop(0, '#7c869c');
   bgrad.addColorStop(0.5, '#e2e9f5');
   bgrad.addColorStop(1, '#5e677b');
   g.fillStyle = bgrad;
-  g.fillRect(-2.6, -bl, 5.2, bl - s * 0.12);
+  g.fillRect(-bw, -bl, bw * 2, bl - s * 0.12);
   g.fillStyle = '#39445e';
   g.beginPath();
-  g.roundRect(-4.2, -bl, 8.4, 7, 2);
+  g.roundRect(-bw - 1.6, -bl, (bw + 1.6) * 2, 7, 2);
   g.fill();
 
-  // башта з об'ємним градієнтом та люком
-  const tr = s * 0.21;
-  const tg = g.createRadialGradient(-tr * 0.35, tr * -0.3, tr * 0.15, 0, s * 0.02, tr * 1.25);
-  tg.addColorStop(0, shade(color, 75));
-  tg.addColorStop(1, shade(color, -40));
-  g.beginPath();
-  g.arc(0, s * 0.02, tr, 0, 7);
-  g.fillStyle = tg;
-  g.fill();
-  g.strokeStyle = 'rgba(0,0,0,.4)';
-  g.lineWidth = 1;
-  g.stroke();
-  g.fillStyle = 'rgba(255,255,255,.28)';
-  g.beginPath();
-  g.arc(tr * 0.3, s * 0.02 + tr * 0.3, tr * 0.28, 0, 7);
-  g.fill();
+  const tg2 = (r, cx, cy) => {
+    const grd = g.createRadialGradient(cx - r * 0.35, cy - r * 0.3, r * 0.15, cx, cy, r * 1.25);
+    grd.addColorStop(0, shade(color, 75));
+    grd.addColorStop(1, shade(color, -40));
+    return grd;
+  };
+
+  if (cls === 'ПТ') {
+    // рубка ПТ-САУ: скошена трапеція замість круглої башти
+    g.beginPath();
+    g.moveTo(-s * 0.22, s * 0.3);
+    g.lineTo(-s * 0.14, -s * 0.22);
+    g.lineTo(s * 0.14, -s * 0.22);
+    g.lineTo(s * 0.22, s * 0.3);
+    g.closePath();
+    const lg = g.createLinearGradient(0, -s * 0.22, 0, s * 0.3);
+    lg.addColorStop(0, shade(color, 55));
+    lg.addColorStop(1, shade(color, -45));
+    g.fillStyle = lg;
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.4)';
+    g.lineWidth = 1;
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    g.fillRect(-s * 0.1, -s * 0.16, s * 0.2, 2.5);
+  } else if (cls === 'ВТ') {
+    // масивна широка башта важкого
+    const tr = s * 0.26;
+    g.beginPath();
+    g.roundRect(-tr, s * 0.02 - tr * 0.85, tr * 2, tr * 1.7, tr * 0.55);
+    g.fillStyle = tg2(tr, 0, s * 0.02);
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.45)';
+    g.lineWidth = 1.2;
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.25)';
+    g.beginPath();
+    g.arc(tr * 0.35, s * 0.02 + tr * 0.3, tr * 0.26, 0, 7);
+    g.fill();
+    g.fillStyle = shade(color, -55);
+    g.fillRect(-tr * 0.7, s * 0.02 + tr * 0.5, tr * 1.4, 2.5);
+  } else {
+    // кругла башта ЛТ (менша) та СТ
+    const tr = cls === 'ЛТ' ? s * 0.17 : s * 0.21;
+    g.beginPath();
+    g.arc(0, s * 0.02, tr, 0, 7);
+    g.fillStyle = tg2(tr, 0, s * 0.02);
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.4)';
+    g.lineWidth = 1;
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.28)';
+    g.beginPath();
+    g.arc(tr * 0.3, s * 0.02 + tr * 0.3, tr * 0.28, 0, 7);
+    g.fill();
+    // антена СТ
+    if (cls === 'СТ') {
+      g.strokeStyle = 'rgba(220,230,245,.5)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(-tr * 0.7, s * 0.02 + tr * 0.5);
+      g.lineTo(-tr * 1.4, s * 0.02 + tr * 1.3);
+      g.stroke();
+    }
+  }
 
   // спалах пострілу
   if (o.flash > 0) {
@@ -1665,21 +1764,22 @@ function drawTank(t, color, isPlayer) {
   if (isPlayer && player.invuln > 0 && Math.floor(player.invuln / 100) % 2) alpha = 0.45;
   if (freezeTimer > 0 && !isPlayer) alpha = 0.6;
 
+  const cls = isPlayer ? battle.tank.cls : (t.cls || 'СТ');
   // корпус — крутиться з напрямком руху
   ctx.save();
   ctx.translate(t.x, t.y);
   ctx.rotate({ up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 }[t.dir]);
   ctx.globalAlpha = alpha;
-  drawHull(ctx, t.size, color, { tread: t.tread || 0 });
+  drawHull(ctx, t.size, color, { tread: t.tread || 0, cls });
   ctx.restore();
 
-  // башта — крутиться незалежно, за прицілом
-  const ta = t.turretAngle !== undefined ? t.turretAngle : DIR_ANGLE[t.dir];
+  // башта — крутиться незалежно, за прицілом (у ПТ рубка жорстко по корпусу)
+  const ta = cls === 'ПТ' ? DIR_ANGLE[t.dir] : (t.turretAngle !== undefined ? t.turretAngle : DIR_ANGLE[t.dir]);
   ctx.save();
   ctx.translate(t.x, t.y);
   ctx.rotate(ta + Math.PI / 2);
   ctx.globalAlpha = alpha;
-  drawTurretGun(ctx, t.size, color, { flash: t.flash || 0 });
+  drawTurretGun(ctx, t.size, color, { flash: t.flash || 0, cls });
   ctx.restore();
   ctx.globalAlpha = 1;
 
@@ -1741,18 +1841,35 @@ function draw() {
     ctx.moveTo(b.x, b.y);
     ctx.lineTo(b.x - b.dx * 16, b.y - b.dy * 16);
     ctx.stroke();
-    // ядро снаряда
     ctx.save();
-    ctx.shadowColor = b.over ? '#c07eff' : b.fromPlayer ? '#39ff88' : '#ff4d5e';
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = b.over ? '#dfc2ff' : b.fromPlayer ? '#8dffc0' : '#ff9aa5';
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, 4.5, 0, 7);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, 2, 0, 7);
-    ctx.fill();
+    if (b.homing) {
+      // ракета: витягнутий корпус з полум'ям
+      const col = b.homing === 'player' ? '#ff9d3c' : '#7ef0ff';
+      ctx.translate(b.x, b.y);
+      ctx.rotate(Math.atan2(b.dy, b.dx));
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.roundRect(-8, -3, 14, 6, 3);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(5, 0, 2.2, 0, 7);
+      ctx.fill();
+    } else {
+      // ядро снаряда
+      ctx.shadowColor = b.over ? '#c07eff' : b.fromPlayer ? '#39ff88' : '#ff4d5e';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = b.over ? '#dfc2ff' : b.fromPlayer ? '#8dffc0' : '#ff9aa5';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 4.5, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 2, 0, 7);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -2114,7 +2231,7 @@ function drawPreview(st) {
   g.translate(pc.width / 2, pc.height / 2 + 6);
   g.rotate(Math.PI / 2);
   g.scale(1.6, 1.6);
-  drawTankShape(g, st.size, CLS_COLOR[st.cls]);
+  drawTankShape(g, st.size, CLS_COLOR[st.cls], { cls: st.cls });
   g.restore();
 }
 
