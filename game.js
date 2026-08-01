@@ -9,42 +9,76 @@
 const CLS_COLOR = { 'ЛТ': '#6fd3ff', 'СТ': '#39ff88', 'ВТ': '#ffd23f', 'ПТ': '#c07eff' };
 
 const TANKS = {
-  kadet:   { name: 'Т-10 «Кадет»',    cls: 'ЛТ', tier: 1, hp: 12, dmg: 2, fireCd: 550, speed: 2.3, armor: 0, bulletSpeed: 6.0, size: 32,
-             prev: null,      research: 0,    cost: 0,     desc: 'Навчальний танк. З нього починається кожен герой.' },
-  sokil:   { name: 'Т-25 «Сокіл»',    cls: 'ЛТ', tier: 2, hp: 15, dmg: 2, fireCd: 420, speed: 2.5, armor: 0, bulletSpeed: 7.0, size: 32,
-             prev: 'kadet',   research: 250,  cost: 600,   desc: 'Швидкий розвідник. Літає по карті, жалить і тікає.' },
-  veteran: { name: 'Т-34 «Ветеран»',  cls: 'СТ', tier: 3, hp: 22, dmg: 3, fireCd: 500, speed: 1.9, armor: 1, bulletSpeed: 7.0, size: 34,
-             prev: 'sokil',   research: 600,  cost: 1800,  desc: 'Легендарний універсал. Надійний у будь-якій ситуації.' },
-  bastion: { name: 'КВ-1 «Бастіон»',  cls: 'ВТ', tier: 4, hp: 34, dmg: 4, fireCd: 620, speed: 1.35, armor: 2, bulletSpeed: 7.0, size: 38,
-             prev: 'veteran', research: 1400, cost: 4500,  desc: 'Важка броня. Снаряди рикошетять, вороги плачуть.' },
-  molot:   { name: 'ІС-7 «Молот»',    cls: 'ВТ', tier: 5, hp: 48, dmg: 5, fireCd: 660, speed: 1.25, armor: 3, bulletSpeed: 7.5, size: 40,
-             prev: 'bastion', research: 3000, cost: 10000, desc: 'Вершина гілки важких. Сталева фортеця на гусеницях.' },
-  osa:     { name: 'СУ-85 «Оса»',     cls: 'ПТ', tier: 4, hp: 18, dmg: 6, fireCd: 850, speed: 1.65, armor: 0, bulletSpeed: 9.0, size: 34,
-             prev: 'veteran', research: 1400, cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
-  kobra:   { name: 'ІСУ-152 «Кобра»', cls: 'ПТ', tier: 5, hp: 24, dmg: 9, fireCd: 980, speed: 1.5, armor: 1, bulletSpeed: 10.0, size: 36,
-             prev: 'osa',     research: 3000, cost: 10000, desc: 'Топова ПТ-САУ. «Бах» — і ворога більше немає.' },
+  // Розвідники (ЛТ)
+  kadet:    { name: 'Т-10 «Кадет»',      cls: 'ЛТ', tier: 1, hp: 12, dmg: 2,  fireCd: 550,  speed: 2.3,  armor: 0, bulletSpeed: 6.0,  size: 32,
+              prev: null,       research: 0,     cost: 0,     desc: 'Навчальний танк. З нього починається кожен герой.' },
+  sokil:    { name: 'Т-25 «Сокіл»',      cls: 'ЛТ', tier: 2, hp: 15, dmg: 2,  fireCd: 420,  speed: 2.5,  armor: 0, bulletSpeed: 7.0,  size: 32,
+              prev: 'kadet',    research: 250,   cost: 600,   desc: 'Швидкий розвідник. Літає по карті, жалить і тікає.' },
+  pryvyd:   { name: 'Т-50 «Привид»',     cls: 'ЛТ', tier: 3, hp: 18, dmg: 3,  fireCd: 380,  speed: 2.8,  armor: 0, bulletSpeed: 7.5,  size: 32,
+              prev: 'sokil',    research: 700,   cost: 2000,  desc: 'Найшвидший танк гри. Вороги бачать лише пил.' },
+  // Універсали (СТ)
+  veteran:  { name: 'Т-34 «Ветеран»',    cls: 'СТ', tier: 3, hp: 22, dmg: 3,  fireCd: 500,  speed: 1.9,  armor: 1, bulletSpeed: 7.0,  size: 34,
+              prev: 'sokil',    research: 600,   cost: 1800,  desc: 'Легендарний універсал. Надійний у будь-якій ситуації.' },
+  bars:     { name: 'Т-44 «Барс»',       cls: 'СТ', tier: 4, hp: 28, dmg: 4,  fireCd: 480,  speed: 2.0,  armor: 1, bulletSpeed: 7.5,  size: 35,
+              prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Швидкий, точний, злий. Танк для тих, хто все вміє.' },
+  shkval:   { name: 'Т-62 «Шквал»',      cls: 'СТ', tier: 5, hp: 36, dmg: 5,  fireCd: 460,  speed: 2.1,  armor: 2, bulletSpeed: 8.0,  size: 36,
+              prev: 'bars',     research: 3000,  cost: 10000, desc: 'Вершина СТ: тисне темпом і не пробачає помилок.' },
+  // Гілка важких (ВТ)
+  bastion:  { name: 'КВ-1 «Бастіон»',    cls: 'ВТ', tier: 4, hp: 34, dmg: 4,  fireCd: 620,  speed: 1.35, armor: 2, bulletSpeed: 7.0,  size: 38,
+              prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Важка броня. Снаряди рикошетять, вороги плачуть.' },
+  molot:    { name: 'ІС-7 «Молот»',      cls: 'ВТ', tier: 5, hp: 48, dmg: 5,  fireCd: 660,  speed: 1.25, armor: 3, bulletSpeed: 7.5,  size: 40,
+              prev: 'bastion',  research: 3000,  cost: 10000, desc: 'Сталева фортеця на гусеницях. Але це ще не вершина...' },
+  mamont:   { name: 'КВ-5 «Мамонт»',     cls: 'ВТ', tier: 6, hp: 68, dmg: 6,  fireCd: 700,  speed: 1.15, armor: 4, bulletSpeed: 7.5,  size: 42,
+              prev: 'molot',    research: 6500,  cost: 24000, desc: 'Ходяча стіна. Половина снарядів просто відскакує.' },
+  tytan:    { name: 'Об.705 «Титан»',    cls: 'ВТ', tier: 7, hp: 92, dmg: 7,  fireCd: 750,  speed: 1.05, armor: 5, bulletSpeed: 8.0,  size: 44,
+              prev: 'mamont',   research: 13000, cost: 50000, desc: 'Абсолютна вершина. Земля дрижить, вороги розбігаються.' },
+  // Снайпери (ПТ-САУ)
+  osa:      { name: 'СУ-85 «Оса»',       cls: 'ПТ', tier: 4, hp: 18, dmg: 6,  fireCd: 850,  speed: 1.65, armor: 0, bulletSpeed: 9.0,  size: 34,
+              prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
+  kobra:    { name: 'ІСУ-152 «Кобра»',   cls: 'ПТ', tier: 5, hp: 24, dmg: 9,  fireCd: 980,  speed: 1.5,  armor: 1, bulletSpeed: 10.0, size: 36,
+              prev: 'osa',      research: 3000,  cost: 10000, desc: '«Бах» — і ворога більше немає.' },
+  skorpion: { name: 'СУ-100 «Скорпіон»', cls: 'ПТ', tier: 6, hp: 30, dmg: 12, fireCd: 1050, speed: 1.45, armor: 1, bulletSpeed: 10.5, size: 38,
+              prev: 'kobra',    research: 6500,  cost: 24000, desc: 'Жало, що пробиває все. Навіть важкі бояться.' },
+  aspid:    { name: 'Об.268 «Аспід»',    cls: 'ПТ', tier: 7, hp: 38, dmg: 16, fireCd: 1150, speed: 1.35, armor: 2, bulletSpeed: 11.0, size: 40,
+              prev: 'skorpion', research: 13000, cost: 50000, desc: 'Один постріл — один труп. Навіть боси здригаються.' },
 };
-const TREE_ORDER = ['kadet', 'sokil', 'veteran', 'bastion', 'molot', 'osa', 'kobra'];
+const TREE_ORDER = ['kadet', 'sokil', 'pryvyd', 'veteran', 'bars', 'shkval',
+  'bastion', 'molot', 'mamont', 'tytan', 'osa', 'kobra', 'skorpion', 'aspid'];
+const BRANCH_LABEL = { 'ЛТ': 'Розвідники (ЛТ)', 'СТ': 'Універсали (СТ)', 'ВТ': 'Гілка важких (ВТ)', 'ПТ': 'Снайпери (ПТ-САУ)' };
 
-// Модулі: 3 рівні кожен
+// Модулі: 5 рівнів кожен
+const MOD_MAX = 5;
 const MODULES = {
-  gun:    { ico: '💥', name: 'Гармата',  desc: '+20% урону за рівень' },
-  armor:  { ico: '🛡', name: 'Броня',    desc: '+1 броні та +15% HP за рівень' },
-  engine: { ico: '🏎', name: 'Двигун',   desc: '+10% швидкості за рівень' },
+  gun:    { ico: '💥', name: 'Гармата',  desc: '+15% урону за рівень' },
+  armor:  { ico: '🛡', name: 'Броня',    desc: '+1 броні та +12% HP за рівень' },
+  engine: { ico: '🏎', name: 'Двигун',   desc: '+8% швидкості за рівень' },
+  susp:   { ico: '🔩', name: 'Ходова',   desc: 'Розгін на 12% швидший за рівень' },
+  radio:  { ico: '📡', name: 'Радіо',    desc: '+6% срібла за бій за рівень' },
 };
 function moduleCost(tier, lvl) { return Math.round((lvl + 1) * 350 * (1 + 0.5 * (tier - 1))); }
 
-// Реальні характеристики танка з урахуванням модулів
+// Екіпаж: досвід накопичується з боями, рівень 1-10, кожен рівень підсилює все
+function crewLevel(ts) { return Math.min(10, Math.floor(Math.sqrt((ts.crewXp || 0) / 120))); }
+function crewNextXp(lvl) { return (lvl + 1) * (lvl + 1) * 120; }
+
+function isElite(ts) { return Object.keys(MODULES).every(k => (ts.modules[k] || 0) >= MOD_MAX); }
+
+// Реальні характеристики танка: база × модулі × екіпаж
 function tankStats(id) {
-  const t = TANKS[id], m = save.tanks[id]?.modules || { gun: 0, armor: 0, engine: 0 };
+  const t = TANKS[id], ts = tankSave(id), m = ts.modules;
+  const crew = crewLevel(ts);
+  const crewMult = 1 + 0.015 * crew;
   return {
     id, name: t.name, cls: t.cls, tier: t.tier, size: t.size,
-    hp: Math.round(t.hp * (1 + 0.15 * m.armor)),
-    dmg: Math.round(t.dmg * (1 + 0.2 * m.gun)),
+    hp: Math.round(t.hp * (1 + 0.12 * m.armor)),
+    dmg: +(t.dmg * (1 + 0.15 * m.gun) * crewMult).toFixed(2),
     armor: t.armor + m.armor,
-    speed: +(t.speed * (1 + 0.1 * m.engine)).toFixed(2),
-    fireCd: t.fireCd,
+    speed: +(t.speed * (1 + 0.08 * m.engine) * crewMult).toFixed(2),
+    fireCd: Math.round(t.fireCd * (1 - 0.01 * crew)),
     bulletSpeed: t.bulletSpeed,
+    ramp: Math.round((CLS_RAMP[t.cls] || 260) * (1 - 0.10 * (m.susp || 0))),
+    radioBonus: 0.06 * (m.radio || 0) + (isElite(ts) ? 0.10 : 0),
+    crew, elite: isElite(ts),
   };
 }
 
@@ -84,8 +118,13 @@ function logEvent(type, data) {
 }
 function getLog() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { return []; } }
 function tankSave(id) {
-  if (!save.tanks[id]) save.tanks[id] = { researched: false, owned: false, xp: 0, modules: { gun: 0, armor: 0, engine: 0 } };
-  return save.tanks[id];
+  if (!save.tanks[id]) save.tanks[id] = { researched: false, owned: false, xp: 0, crewXp: 0, modules: {} };
+  const ts = save.tanks[id];
+  // міграція старих сейвів: додаємо нові поля
+  if (!ts.modules) ts.modules = {};
+  for (const k of Object.keys(MODULES)) if (typeof ts.modules[k] !== 'number') ts.modules[k] = 0;
+  if (typeof ts.crewXp !== 'number') ts.crewXp = 0;
+  return ts;
 }
 
 // ---------- Карти боїв ----------
@@ -359,7 +398,7 @@ function startBattle() {
     maxHp: st.hp, hp: st.hp, dmg: st.dmg, armor: st.armor,
     speed: st.speed, fireCd: st.fireCd, bulletSpeed: st.bulletSpeed,
     cooldown: 0, invuln: 1500, turretAngle: -Math.PI / 2,
-    accelMs: 0, ramp: CLS_RAMP[st.cls] || 260,
+    accelMs: 0, ramp: st.ramp,
   };
 
   grid = []; gridHp = [];
@@ -694,7 +733,7 @@ function updateBullets(dt) {
                Math.abs(b.y - player.y) < player.size / 2) {
       b.dead = true;
       // РИКОШЕТ: шанс залежить від броні — фішка важких танків
-      const ricoChance = Math.min(0.35, player.armor * 0.06);
+      const ricoChance = Math.min(0.45, player.armor * 0.06);
       if (Math.random() < ricoChance) {
         battle.ricochets++;
         sfx.rico();
@@ -810,11 +849,12 @@ function endBattle(victory) {
 
   const mult = battle.tierMult * (battle.elite ? 2 : 1);
   const winBonus = victory ? Math.round((battle.mode === 'assault' ? 350 : 250) * battle.tank.tier) : 0;
-  const creditsEarned = Math.round(battle.credits * mult) + winBonus;
+  const creditsEarned = Math.round((battle.credits * mult + winBonus) * (1 + (battle.tank.radioBonus || 0)));
   const xpEarned = Math.round((battle.xp + (victory ? 60 * battle.tank.tier : 0)) * mult);
 
   save.credits += creditsEarned;
   tankSave(save.current).xp += xpEarned;
+  tankSave(save.current).crewXp += xpEarned;
   save.battles++;
   if (victory) save.wins++;
   save.totalFrags += battle.frags;
@@ -1428,7 +1468,7 @@ function renderHangar() {
   let lastBranch = '';
   for (const id of TREE_ORDER) {
     const t = TANKS[id], ts = tankSave(id);
-    const branch = t.cls === 'ПТ' ? 'Гілка ПТ-САУ (снайпери)' : 'Основна гілка (до важких)';
+    const branch = BRANCH_LABEL[t.cls];
     if (branch !== lastBranch) {
       lastBranch = branch;
       const lb = document.createElement('div');
@@ -1507,16 +1547,23 @@ function tankNodeClick(id) {
 
 function renderTankDetail() {
   const id = save.current, t = TANKS[id], ts = tankSave(id), st = tankStats(id);
-  document.getElementById('tankTitle').textContent = `${t.name} · ${t.cls} · Тір ${t.tier}`;
+  document.getElementById('tankTitle').textContent =
+    `${t.name} · ${t.cls} · Тір ${t.tier}` + (st.elite ? ' · ⚜ ЕЛІТНИЙ' : '');
 
+  const crewNow = ts.crewXp || 0;
+  const crewNext = crewNextXp(st.crew);
+  const crewPct = st.crew >= 10 ? 100 : Math.round(crewNow / crewNext * 100);
   document.getElementById('tankStats').innerHTML = `
     <p style="color:var(--dim);font-size:12px;margin:8px 0">${t.desc}</p>
     <div class="statRow"><span>❤️ Міцність</span><span class="val">${st.hp} HP</span></div>
-    <div class="statRow"><span>💥 Урон за постріл</span><span class="val">${st.dmg}</span></div>
-    <div class="statRow"><span>🛡 Броня (рикошет ${Math.round(Math.min(0.35, st.armor * 0.06) * 100)}%)</span><span class="val">${st.armor}</span></div>
+    <div class="statRow"><span>💥 Урон за постріл</span><span class="val">${Math.round(st.dmg * 10) / 10}</span></div>
+    <div class="statRow"><span>🛡 Броня (рикошет ${Math.round(Math.min(0.45, st.armor * 0.06) * 100)}%)</span><span class="val">${st.armor}</span></div>
     <div class="statRow"><span>🏎 Швидкість</span><span class="val">${st.speed}</span></div>
     <div class="statRow"><span>🔫 Перезарядка</span><span class="val">${(st.fireCd / 1000).toFixed(2)} с</span></div>
-    <div class="statRow"><span>⭐ Досвід танка</span><span class="val">${fmt(ts.xp)}</span></div>`;
+    <div class="statRow"><span>👥 Екіпаж: рівень ${st.crew}${st.crew >= 10 ? ' (МАКС)' : ''}</span><span class="val">${st.crew >= 10 ? '★' : crewPct + '%'}</span></div>
+    <div class="statRow"><span>📡 Бонус срібла</span><span class="val">+${Math.round(st.radioBonus * 100)}%</span></div>
+    <div class="statRow"><span>⭐ Досвід танка</span><span class="val">${fmt(ts.xp)}</span></div>
+    <p style="color:var(--dim);font-size:11px;margin-top:6px">Екіпаж росте з кожним боєм: +1.5% урону і швидкості, −1% перезарядки за рівень. Усі модулі 5/5 → танк стає ЕЛІТНИМ (+10% срібла).</p>`;
 
   drawPreview(st);
 
@@ -1526,12 +1573,12 @@ function renderTankDetail() {
     const m = MODULES[key], lvl = ts.modules[key];
     const row = document.createElement('div');
     row.className = 'modRow';
-    if (lvl >= 3) {
-      row.innerHTML = `<span>${m.ico} ${m.name} <span class="pips">●●●</span></span><span style="color:var(--neon)">МАКС</span>`;
+    if (lvl >= MOD_MAX) {
+      row.innerHTML = `<span>${m.ico} ${m.name} <span class="pips">${'●'.repeat(MOD_MAX)}</span></span><span style="color:var(--neon)">МАКС</span>`;
     } else {
       const cost = moduleCost(t.tier, lvl);
       row.innerHTML = `
-        <span>${m.ico} ${m.name} <span class="pips">${'●'.repeat(lvl)}${'○'.repeat(3 - lvl)}</span><br>
+        <span>${m.ico} ${m.name} <span class="pips">${'●'.repeat(lvl)}${'○'.repeat(MOD_MAX - lvl)}</span><br>
         <span style="color:var(--dim);font-size:11px">${m.desc}</span></span>`;
       const btn = document.createElement('button');
       btn.className = 'btn small';
