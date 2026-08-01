@@ -139,6 +139,31 @@
   #battleHint {
     text-align: center; color: var(--dim); font-size: 11px; margin-top: 6px;
   }
+  /* ======== Фронтова мапа ======== */
+  #frontView { width: 100%; max-width: 960px; }
+  #frontMap {
+    position: relative; height: 540px; margin-top: 12px; overflow: hidden;
+    background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
+    background-image: radial-gradient(rgba(57,255,136,.05) 1px, transparent 1.5px);
+    background-size: 26px 26px;
+  }
+  #frontEdges { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sector {
+    position: absolute; transform: translate(-50%, -50%); width: 122px; z-index: 2;
+    text-align: center; padding: 7px 5px; font-size: 11px;
+    border: 2px solid var(--border); border-radius: 8px; background: var(--panel2);
+  }
+  .sector .sn { font-size: 12px; }
+  .sector .sm { color: var(--dim); font-size: 10px; }
+  .sector .sr { color: var(--gold); font-size: 10px; margin-top: 2px; }
+  .sector.lib { border-color: var(--neon); }
+  .sector.lib .sn { color: var(--neon); }
+  .sector.atk { border-color: var(--gold); cursor: pointer; animation: pulseS 1.6s infinite; }
+  .sector.atk:hover { transform: translate(-50%, -50%) scale(1.07); }
+  .sector.lock { opacity: .38; }
+  @keyframes pulseS { 50% { box-shadow: 0 0 16px rgba(255,210,63,.5); } }
+  #eliteBanner2 { text-align: center; color: var(--danger); font-size: 12px; margin-top: 8px; animation: blink 1s infinite; }
+  #frontHint { text-align: center; color: var(--dim); font-size: 11px; margin-top: 6px; }
   #resultTable { margin: 10px auto; font-size: 14px; text-align: left; }
   #resultTable td { padding: 3px 12px; }
   #resultTable td:last-child { color: var(--gold); text-align: right; }
@@ -194,23 +219,47 @@
         <div id="modList"></div>
       </div>
       <div class="box">
-        <button class="btn gold" id="battleBtn">⚔ В БІЙ!</button>
-        <div id="eliteBanner" class="hidden">☠ НАСТУПНИЙ БІЙ — ЕЛІТНИЙ: БОС І ПОДВІЙНА НАГОРОДА ☠</div>
+        <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
       </div>
     </div>
   </div>
   <div id="hangarFoot">
     Прогрес зберігається автоматично в цьому браузері ·
+    <button class="btn small" id="musicBtn">🎵 музика [M]</button>
     <button class="btn small" id="logBtn">📊 лог боїв</button>
     <button class="btn small" id="logClearBtn">очистити лог</button>
     <button class="btn danger small" id="resetBtn">скинути прогрес</button>
   </div>
 </div>
 
+<!-- ==================== ФРОНТ ==================== -->
+<div id="frontView" class="hidden">
+  <div id="hangarHead">
+    <h1>🗺 <span id="frontLvl">ФРОНТ I</span></h1>
+    <div class="res">
+      <span>звільнено: <b id="frontProg">0/11</b></span>
+      <span>бонус: <b id="frontBonusUi">+0%</b></span>
+      <button class="btn small" id="backHangarBtn">⬅ ангар</button>
+      <button class="btn gold small" id="freeBattleBtn">⚔ вільний бій</button>
+    </div>
+  </div>
+  <div id="frontMap"><svg id="frontEdges"></svg></div>
+  <div id="eliteBanner2" class="hidden">☠ наступний ВІЛЬНИЙ бій — елітний: бос і подвійна нагорода ☠</div>
+  <div id="frontHint">Обирай золотий сектор і атакуй. Звільнені сектори дають постійний бонус срібла. Пройди до ☭ ЦИТАДЕЛІ!</div>
+</div>
+
 <!-- ==================== БІЙ ==================== -->
 <div id="battleView" class="hidden">
   <div id="gameBox">
     <canvas id="game" width="640" height="560"></canvas>
+
+    <div id="pauseOverlay" class="overlay hidden">
+      <h2>⏸ ПАУЗА</h2>
+      <p class="sub">Бій зачекає. Видихни.</p>
+      <button class="btn" id="resumeBtn">ПРОДОВЖИТИ [Esc]</button>
+      <button class="btn danger" id="quitBtn" style="margin-top:10px">ПОКИНУТИ БІЙ [Q]</button>
+      <p class="sub" style="margin-top:14px">M — музика увімк/вимк</p>
+    </div>
 
     <div id="perkOverlay" class="overlay hidden">
       <h2>📦 ПОСТАЧАННЯ ПРИБУЛО!</h2>
@@ -225,7 +274,7 @@
       <button class="btn" id="toHangarBtn">В АНГАР [Enter]</button>
     </div>
 
-    <div id="battleHint">WASD — рух · СТРІЛКИ — вогонь у той бік (можна по діагоналі!) · E — аптечка · Esc — вихід</div>
+    <div id="battleHint">WASD / стрілки — рух · Пробіл — вогонь (куди дивишся — туди летить) · E — аптечка · Esc — вихід</div>
   </div>
 
 </div>

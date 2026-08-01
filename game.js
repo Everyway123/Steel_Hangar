@@ -92,6 +92,7 @@ function defaultSave() {
     battles: 0, wins: 0, totalFrags: 0,
     current: 'kadet',
     tanks: { kadet: { researched: true, owned: true, xp: 0, modules: { gun: 0, armor: 0, engine: 0 } } },
+    front: { level: 1, liberated: ['plazdarm'] },
   };
 }
 function loadSave() {
@@ -102,6 +103,7 @@ function loadSave() {
     // стартовий танк завжди відкритий
     const k = tankSave('kadet');
     k.researched = true; k.owned = true;
+    if (!save.front) save.front = { level: 1, liberated: ['plazdarm'] };
   } catch (e) { save = defaultSave(); }
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
@@ -278,6 +280,34 @@ const MAPS = [
   ]},
 ];
 
+// ---------- Фронтова мапа (кампанія) ----------
+// Звільняй сектори від Плацдарму до Цитаделі. Кожен сектор — бій зі своїм
+// модифікатором. Після Цитаделі фронт відкривається знову, але складніший.
+const MOD_INFO = {
+  fog:       { ico: '🌫', name: 'Туман',      desc: 'Видимість скорочена — бої впритул' },
+  night:     { ico: '🌙', name: 'Нічний бій', desc: 'Темрява, видно лише навколо танка' },
+  artillery: { ico: '💥', name: 'Артобстріл', desc: 'З неба падають снаряди — не стій під міткою!' },
+  mines:     { ico: '☢', name: 'Мінне поле', desc: 'Міни скрізь — дивись під гусениці' },
+  frost:     { ico: '❄', name: 'Мороз',      desc: 'Всі повільніші, техніка мерзне' },
+};
+
+const FRONT_SECTORS = [
+  { id: 'plazdarm',    name: 'Плацдарм',          x: 7,  y: 50, base: true, links: ['polihon', 'peredmistia'] },
+  { id: 'polihon',     name: 'Полігон',           x: 21, y: 24, map: 'Полігон',              mode: 'clear',   mod: null,        reward: 400,  links: ['pisky', 'mist'] },
+  { id: 'peredmistia', name: 'Передмістя',        x: 21, y: 76, map: 'Міські руїни',         mode: 'clear',   mod: null,        reward: 400,  links: ['mist', 'sklady'] },
+  { id: 'pisky',       name: 'Піски',             x: 37, y: 10, map: 'Пустельний рубіж',     mode: 'clear',   mod: 'night',     reward: 700,  links: ['fort'] },
+  { id: 'mist',        name: 'Міст',              x: 37, y: 50, map: 'Річкова переправа',    mode: 'clear',   mod: 'fog',       reward: 700,  links: ['fort'] },
+  { id: 'sklady',      name: 'Склади',            x: 37, y: 90, map: 'Склад боєприпасів',    mode: 'clear',   mod: 'artillery', reward: 700,  links: ['radar'] },
+  { id: 'fort',        name: 'Форт «Сталь»',      x: 53, y: 28, map: 'Сталева фортеця',      mode: 'clear',   mod: 'mines',     reward: 1100, links: ['kotel', 'ksh'] },
+  { id: 'radar',       name: 'Радарна база',      x: 53, y: 74, map: 'Штурм: Радарна база',  mode: 'assault', mod: 'fog',       reward: 1200, links: ['ksh'] },
+  { id: 'kotel',       name: 'Котел',             x: 69, y: 14, map: 'Арена генерала',       mode: 'clear',   mod: 'frost',     reward: 1800, boss: true, links: ['zavod'] },
+  { id: 'ksh',         name: 'Командний центр',   x: 71, y: 56, map: 'Штурм: Командний центр', mode: 'assault', mod: 'night',   reward: 1600, links: ['zavod'] },
+  { id: 'zavod',       name: 'Танковий завод',    x: 84, y: 32, map: 'Склад боєприпасів',    mode: 'assault', mod: 'artillery', reward: 2400, links: ['tsytadel'] },
+  { id: 'tsytadel',    name: '☭ ЦИТАДЕЛЬ',        x: 93, y: 68, map: 'Арена генерала',       mode: 'assault', mod: 'mines',     reward: 5000, boss: true, final: true, links: [] },
+];
+function sectorById(id) { return FRONT_SECTORS.find(s => s.id === id); }
+function frontBonus() { return 0.02 * Math.max(0, (save.front.liberated.length - 1)); }
+
 // ---------- Вороги ----------
 const ENEMY_TYPES = {
   scout:   { hp: 4,  speed: 1.65, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff' },
@@ -352,39 +382,161 @@ let state = 'hangar';
 let keys = {}, lastTime = 0, shakeTime = 0, freezeTimer = 0;
 let pendingPerks = 0;
 
-// ---------- Звуки ----------
-let audioCtx = null;
-function beep(freq, dur, type, vol) {
+// ---------- Аудіо: соковиті звуки + процедурна музика ----------
+let audioCtx = null, noiseBuf = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function getNoise() {
+  if (!noiseBuf) {
+    noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
+// тон з ковзанням частоти
+function beep(freq, dur, type, vol, freqEnd) {
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    ensureAudio();
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = type || 'square';
-    o.frequency.value = freq;
+    o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, audioCtx.currentTime + dur);
     g.gain.setValueAtTime(vol || 0.06, audioCtx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
     o.connect(g); g.connect(audioCtx.destination);
     o.start(); o.stop(audioCtx.currentTime + dur);
   } catch (e) {}
 }
+// шумовий сплеск через фільтр — тіло вибухів і пострілів
+function noiseBurst(dur, filterType, filterFreq, vol) {
+  try {
+    ensureAudio();
+    const src = audioCtx.createBufferSource();
+    src.buffer = getNoise();
+    const f = audioCtx.createBiquadFilter();
+    f.type = filterType; f.frequency.value = filterFreq;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vol, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(audioCtx.destination);
+    src.start(); src.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
+}
 const sfx = {
-  shoot: () => beep(220, 0.08, 'square', 0.05),
-  hit: () => beep(140, 0.1, 'sawtooth', 0.06),
-  rico: () => { beep(700, 0.06, 'triangle', 0.08); beep(1100, 0.1, 'triangle', 0.06); },
-  boom: () => { beep(90, 0.3, 'sawtooth', 0.1); beep(60, 0.4, 'triangle', 0.1); },
-  perk: () => { beep(523, 0.12, 'square', 0.07); setTimeout(() => beep(659, 0.12, 'square', 0.07), 110); setTimeout(() => beep(784, 0.2, 'square', 0.07), 220); },
-  pickup: () => beep(880, 0.1, 'sine', 0.08),
-  brick: () => beep(320, 0.05, 'square', 0.04),
-  cash: () => { beep(660, 0.08, 'sine', 0.07); setTimeout(() => beep(990, 0.12, 'sine', 0.07), 90); },
+  // постріл: низький «удар» + короткий тріск пороху
+  shoot: () => { beep(150, 0.12, 'sine', 0.09, 55); noiseBurst(0.06, 'highpass', 900, 0.05); },
+  hit: () => { beep(120, 0.09, 'sawtooth', 0.05, 70); noiseBurst(0.05, 'bandpass', 600, 0.05); },
+  // рикошет: металевий дзвін
+  rico: () => { beep(1400, 0.1, 'triangle', 0.05); beep(2150, 0.14, 'triangle', 0.035); noiseBurst(0.03, 'highpass', 3000, 0.03); },
+  // вибух: суб-бас + шумова хвиля
+  boom: () => { beep(60, 0.5, 'sine', 0.16, 28); noiseBurst(0.45, 'lowpass', 320, 0.18); noiseBurst(0.12, 'bandpass', 900, 0.08); },
+  perk: () => { beep(523, 0.12, 'square', 0.05); setTimeout(() => beep(659, 0.12, 'square', 0.05), 110); setTimeout(() => beep(784, 0.22, 'square', 0.05), 220); },
+  pickup: () => { beep(880, 0.09, 'sine', 0.07); beep(1320, 0.14, 'sine', 0.04); },
+  brick: () => noiseBurst(0.06, 'bandpass', 520, 0.07),
+  cash: () => { beep(660, 0.08, 'sine', 0.06); setTimeout(() => beep(990, 0.12, 'sine', 0.06), 90); },
 };
 
+// ---------- Музика: акуратний темний синтвейв, генерується на льоту ----------
+const music = {
+  on: localStorage.getItem('shMusic') !== '0',
+  started: false, step: 0, next: 0, timer: null, delay: null,
+};
+const NOTE = n => 55 * Math.pow(2, n / 12); // від A1
+// Am — F — C — G, корені у півтонах від A
+const CHORDS = [
+  { root: 0,  tones: [0, 3, 7, 12] },
+  { root: 8,  tones: [0, 4, 7, 12] },
+  { root: 3,  tones: [0, 4, 7, 12] },
+  { root: 10, tones: [0, 4, 7, 12] },
+];
+const BASS_PAT = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0];
+const ARP_PAT  = [0, null, 1, null, 2, null, null, 3, null, 2, null, 1, null, null, 2, null];
+
+function startMusic() {
+  if (music.started || !music.on) return;
+  try {
+    ensureAudio();
+    music.delay = audioCtx.createDelay(1);
+    music.delay.delayTime.value = 0.34;
+    const fb = audioCtx.createGain(); fb.gain.value = 0.32;
+    const wet = audioCtx.createGain(); wet.gain.value = 0.5;
+    music.delay.connect(fb); fb.connect(music.delay);
+    music.delay.connect(wet); wet.connect(audioCtx.destination);
+    music.started = true;
+    music.next = audioCtx.currentTime + 0.1;
+    music.timer = setInterval(musicSchedule, 60);
+  } catch (e) {}
+}
+function musicSchedule() {
+  if (!music.on || !audioCtx) return;
+  const stepDur = 60 / 92 / 4; // 92 BPM, 16-ті
+  while (music.next < audioCtx.currentTime + 0.25) {
+    musicStep(music.step, music.next, stepDur);
+    music.step = (music.step + 1) % 64;
+    music.next += stepDur;
+  }
+}
+function musicNote(freq, t, dur, type, vol, dest) {
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(dest || audioCtx.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function musicStep(i, t, stepDur) {
+  const chord = CHORDS[Math.floor(i / 16) % 4];
+  const s16 = i % 16;
+  // бас — м'який трикутний пульс
+  if (BASS_PAT[s16]) musicNote(NOTE(chord.root), t, stepDur * 2.6, 'triangle', 0.05);
+  // арпеджіо — рідке, з відлунням
+  const arp = ARP_PAT[s16];
+  if (arp !== null) {
+    const oct = Math.floor(i / 32) % 2 ? 36 : 24;
+    musicNote(NOTE(chord.root + chord.tones[arp] + oct), t, stepDur * 1.8, 'sine', 0.035, music.delay);
+  }
+  // легкий «хет» на слабку долю
+  if (s16 % 4 === 2) noiseBurstAt(t, 0.03, 'highpass', 6000, 0.012);
+}
+function noiseBurstAt(t, dur, type, freq, vol) {
+  const src = audioCtx.createBufferSource();
+  src.buffer = getNoise();
+  const f = audioCtx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  src.start(t); src.stop(t + dur);
+}
+function toggleMusic() {
+  music.on = !music.on;
+  localStorage.setItem('shMusic', music.on ? '1' : '0');
+  if (music.on) { music.started = false; startMusic(); }
+  flashMsg(music.on ? '🎵 Музика увімкнена' : '🔇 Музика вимкнена');
+}
+
 // ---------- Запуск бою ----------
-function startBattle() {
+// sector = об'єкт сектора фронту, або null для вільного бою
+function startBattle(sector) {
+  startMusic();
   const st = tankStats(save.current);
-  const elite = (save.battles + 1) % 5 === 0;
-  const mapDef = MAPS[Math.floor(Math.random() * MAPS.length)];
+  const elite = sector ? !!sector.boss : (save.battles + 1) % 5 === 0;
+  const mapDef = sector
+    ? MAPS.find(m => m.name === sector.map) || MAPS[0]
+    : MAPS[Math.floor(Math.random() * MAPS.length)];
 
   battle = {
-    tank: st, elite, mapName: mapDef.name, mode: mapDef.mode || 'clear',
+    tank: st, elite, mapName: mapDef.name,
+    mode: sector ? sector.mode : (mapDef.mode || 'clear'),
+    sector: sector ? sector.id : null,
+    mod: sector ? sector.mod : null,
+    speedMult: sector && sector.mod === 'frost' ? 0.8 : 1,
+    mines: [], strikes: [], artT: 3000,
     frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0,
     supply: 20000, medkit: true, idle: 0, farmWarned: false, arcWarned: false,
@@ -427,6 +579,19 @@ function startBattle() {
     for (let c = 0; c < COLS; c++)
       if (grid[r][c] === T_HQ) battle.hqLeft++;
 
+  // мінне поле: розкидаємо міни по вільних клітинах подалі від спавну гравця
+  if (battle.mod === 'mines') {
+    let tries = 0;
+    while (battle.mines.length < 11 && tries++ < 300) {
+      const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+      const c = Math.floor(Math.random() * COLS);
+      const x = c * TILE + TILE / 2, y = r * TILE + TILE / 2;
+      if (grid[r][c] === T_EMPTY && Math.hypot(x - player.x, y - player.y) > 140) {
+        battle.mines.push({ x, y });
+      }
+    }
+  }
+
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
   maxAlive = Math.min(6, 3 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
@@ -448,8 +613,9 @@ function startBattle() {
 // ---------- Масштабування ворогів під тір ----------
 function scaledEnemy(typeName, tier) {
   const t = ENEMY_TYPES[typeName];
-  const hpMult = 1 + 0.35 * (tier - 1);
-  const dmgAdd = Math.floor((tier - 1) / 2);
+  const fl = (save.front && save.front.level || 1) - 1; // рівень фронту робить всіх злішими
+  const hpMult = (1 + 0.35 * (tier - 1)) * (1 + 0.3 * fl);
+  const dmgAdd = Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
     hp: Math.round(t.hp * hpMult), maxHp: Math.round(t.hp * hpMult),
@@ -625,7 +791,7 @@ function updateEnemy(e, dt) {
   }
   if (e.flash > 0) e.flash -= dt;
   if (e.slowT > 0) e.slowT -= dt;
-  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.55 : 1) * (e.slowT > 0 ? 0.55 : 1);
+  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.55 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
   if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
   else e.tread = (e.tread || 0) + eSpeed;
 
@@ -635,11 +801,12 @@ function updateEnemy(e, dt) {
   // стріляє лише коли реально бачить гравця (можна ховатися за стінами!)
   e.cooldown -= dt;
   if (e.cooldown <= 0) {
+    const range = battle.mod === 'fog' ? 280 : 460; // у тумані бачать гірше
     const dist = Math.hypot(player.x - e.x, player.y - e.y);
-    if (dist < 460 && hasLOS(e.x, e.y, player.x, player.y)) {
+    if (dist < range && hasLOS(e.x, e.y, player.x, player.y)) {
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
       e.cooldown = e.fireCd + Math.random() * 400;
-    } else if (dist < 460 && battle.idle > 10000) {
+    } else if (dist < range && battle.idle > 10000) {
       // анти-кемпінг: по нерухомому гравцю б'ють навісом через стіни
       if (!battle.arcWarned) {
         battle.arcWarned = true;
@@ -861,7 +1028,25 @@ function endBattle(victory) {
 
   const mult = battle.tierMult * (battle.elite ? 2 : 1);
   const winBonus = victory ? Math.round((battle.mode === 'assault' ? 350 : 250) * battle.tank.tier) : 0;
-  const creditsEarned = Math.round((battle.credits * mult + winBonus) * (1 + (battle.tank.radioBonus || 0)));
+  const creditsEarned = Math.round((battle.credits * mult + winBonus) * (1 + (battle.tank.radioBonus || 0) + frontBonus()));
+
+  // звільнення сектора фронту
+  let sectorMsg = '';
+  if (victory && battle.sector) {
+    const sec = sectorById(battle.sector);
+    if (!save.front.liberated.includes(battle.sector)) {
+      save.front.liberated.push(battle.sector);
+      save.credits += sec.reward;
+      sectorMsg = `🚩 СЕКТОР «${sec.name}» ЗВІЛЬНЕНО! +${fmt(sec.reward)} 🪙`;
+    } else {
+      sectorMsg = `🚩 Сектор «${sec.name}» утримано`;
+    }
+    if (sec.final) {
+      save.front.level++;
+      save.front.liberated = ['plazdarm'];
+      sectorMsg = `🏆 ЦИТАДЕЛЬ ВПАЛА! ФРОНТ ${save.front.level - 1} ПРОРВАНО!<br>Відкрито Фронт ${save.front.level} — вороги значно зліші, нагороди більші.`;
+    }
+  }
   const xpEarned = Math.round((battle.xp + (victory ? 60 * battle.tank.tier : 0)) * mult);
 
   save.credits += creditsEarned;
@@ -898,17 +1083,84 @@ function endBattle(victory) {
     <tr><td>Рикошети</td><td>${battle.ricochets}</td></tr>
     <tr><td>Срібло</td><td>+${creditsEarned} 🪙</td></tr>
     <tr><td>Досвід танка</td><td>+${xpEarned} ⭐</td></tr>`;
-  document.getElementById('medals').innerHTML = medals.join('<br>');
+  document.getElementById('medals').innerHTML =
+    (sectorMsg ? `<div style="color:var(--neon);margin-bottom:6px">${sectorMsg}</div>` : '') + medals.join('<br>');
   document.getElementById('resultOverlay').classList.remove('hidden');
   if (victory) sfx.cash(); else sfx.boom();
 }
 
 function toHangar() {
-  state = 'hangar';
   document.body.classList.remove('inBattle');
   document.getElementById('battleView').classList.add('hidden');
+  // із секторного бою повертаємось на фронтову мапу, з вільного — в ангар
+  if (battle && battle.sector) { showFront(); return; }
+  state = 'hangar';
   document.getElementById('hangarView').classList.remove('hidden');
   renderHangar();
+}
+
+// ---------- Фронтова мапа (екран) ----------
+function showFront() {
+  state = 'front';
+  document.body.classList.remove('inBattle');
+  document.getElementById('battleView').classList.add('hidden');
+  document.getElementById('hangarView').classList.add('hidden');
+  document.getElementById('frontView').classList.remove('hidden');
+  renderFront();
+}
+
+function frontToHangar() {
+  state = 'hangar';
+  document.getElementById('frontView').classList.add('hidden');
+  document.getElementById('hangarView').classList.remove('hidden');
+  renderHangar();
+}
+
+function sectorState(s) {
+  const lib = save.front.liberated;
+  if (lib.includes(s.id)) return 'lib';
+  const reachable = FRONT_SECTORS.some(o => lib.includes(o.id) && o.links.includes(s.id));
+  return reachable ? 'atk' : 'lock';
+}
+
+function renderFront() {
+  document.getElementById('frontLvl').textContent = 'ФРОНТ ' + 'I'.repeat(Math.min(5, save.front.level)) + (save.front.level > 5 ? '+' + (save.front.level - 5) : '');
+  document.getElementById('frontProg').textContent = `${save.front.liberated.length - 1}/${FRONT_SECTORS.length - 1}`;
+  document.getElementById('frontBonusUi').textContent = '+' + Math.round(frontBonus() * 100) + '% срібла';
+
+  // з'єднання
+  const svg = document.getElementById('frontEdges');
+  let lines = '';
+  for (const s of FRONT_SECTORS) {
+    for (const to of s.links) {
+      const t = sectorById(to);
+      const active = save.front.liberated.includes(s.id);
+      lines += `<line x1="${s.x}%" y1="${s.y}%" x2="${t.x}%" y2="${t.y}%" stroke="${active ? '#39ff8866' : '#263149'}" stroke-width="2" stroke-dasharray="${active ? '' : '5,5'}"/>`;
+    }
+  }
+  svg.innerHTML = lines;
+
+  // сектори
+  const box = document.getElementById('frontMap');
+  for (const el of box.querySelectorAll('.sector')) el.remove();
+  for (const s of FRONT_SECTORS) {
+    const st = sectorState(s);
+    const div = document.createElement('div');
+    div.className = 'sector ' + st;
+    div.style.left = s.x + '%';
+    div.style.top = s.y + '%';
+    const modStr = s.mod ? MOD_INFO[s.mod].ico + ' ' + MOD_INFO[s.mod].name : '';
+    const modeStr = s.base ? '' : (s.mode === 'assault' ? '☭ штурм' : '⚔ зачистка') + (s.boss ? ' · ☠ БОС' : '');
+    div.innerHTML = `
+      <div class="sn">${st === 'lib' ? '✅ ' : st === 'lock' ? '🔒 ' : '⚔ '}${s.name}</div>
+      ${modeStr ? `<div class="sm">${modeStr}</div>` : '<div class="sm">твій тил</div>'}
+      ${modStr ? `<div class="sm">${modStr}</div>` : ''}
+      ${st === 'atk' ? `<div class="sr">🪙 +${fmt(s.reward)}</div>` : ''}`;
+    if (st === 'atk') div.onclick = () => startBattle(s);
+    box.appendChild(div);
+  }
+
+  document.getElementById('eliteBanner2').classList.toggle('hidden', (save.battles + 1) % 5 !== 0);
 }
 
 // ---------- Тактичні переваги ----------
@@ -963,6 +1215,69 @@ function pickPerk(u) {
   state = 'play';
   player.invuln = Math.max(player.invuln, 700);
   lastTime = performance.now();
+}
+
+// ---------- Модифікатори секторів ----------
+function modExplosion(x, y, R, dmgP, dmgE) {
+  sfx.boom();
+  shakeTime = 250;
+  spawnParticles(x, y, '#ff9d3c', 22);
+  for (const e of enemies) {
+    if (e.dead || e.spawning > 0) continue;
+    if (Math.hypot(e.x - x, e.y - y) < R) {
+      e.hp -= dmgE;
+      battle.dmgDealt += dmgE;
+      if (e.hp <= 0) killEnemy(e);
+    }
+  }
+  if (Math.hypot(player.x - x, player.y - y) < R && player.invuln <= 0) {
+    const dmg = Math.max(1, dmgP - player.armor);
+    player.hp -= dmg;
+    battle.dmgTaken += dmg;
+    player.invuln = 600;
+    floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
+    if (player.hp <= 0) endBattle(false);
+  }
+}
+
+function updateModifiers(dt) {
+  // міни: спрацьовують і на гравцеві, і на ворогах
+  if (battle.mines.length) {
+    for (const m of battle.mines) {
+      if (Math.hypot(m.x - player.x, m.y - player.y) < 22) { m.dead = true; modExplosion(m.x, m.y, 70, 5, 8); }
+      else {
+        for (const e of enemies) {
+          if (e.dead || e.spawning > 0) continue;
+          if (Math.hypot(m.x - e.x, m.y - e.y) < 22) { m.dead = true; modExplosion(m.x, m.y, 70, 5, 8); break; }
+        }
+      }
+      if (state !== 'play') return;
+    }
+    battle.mines = battle.mines.filter(m => !m.dead);
+  }
+
+  // артобстріл: мітка попереджає, потім вибух
+  if (battle.mod === 'artillery') {
+    battle.artT -= dt;
+    if (battle.artT <= 0) {
+      battle.artT = 3200 + Math.random() * 2600;
+      battle.strikes.push({
+        x: Math.max(30, Math.min(W - 30, player.x + (Math.random() - 0.5) * 300)),
+        y: Math.max(30, Math.min(H - 30, player.y + (Math.random() - 0.5) * 300)),
+        t: 1400,
+      });
+    }
+  }
+  for (const s of battle.strikes) {
+    s.t -= dt;
+    if (s.t <= 0) { s.dead = true; modExplosion(s.x, s.y, 78, 5, 9); if (state !== 'play') return; }
+  }
+  battle.strikes = battle.strikes.filter(s => !s.dead);
+
+  // мороз: сніжинки
+  if (battle.mod === 'frost' && Math.random() < 0.25) {
+    particles.push({ x: Math.random() * W, y: -5, vx: (Math.random() - 0.5) * 0.4, vy: 0.7 + Math.random() * 0.5, life: 4000, color: 'rgba(220,235,255,.7)' });
+  }
 }
 
 // ---------- Аптечка (одна на бій, клавіша E) ----------
@@ -1027,29 +1342,18 @@ function updatePlayer(dt) {
   else { player.accelMs = 0; battle.idle += dt; }
   const accel = 0.35 + 0.65 * Math.min(1, player.accelMs / player.ramp);
 
-  // пісок сповільнює наполовину
+  // пісок сповільнює наполовину, мороз — усіх на 20%
   const sandMult = tileAt(player.x, player.y) === T_SAND ? 0.55 : 1;
-  const dist = player.speed * sandMult * accel * dt / 16.67;
+  const dist = player.speed * sandMult * accel * (battle.speedMult || 1) * dt / 16.67;
   if (dir && moveTank(player, dir, dist)) player.tread = (player.tread || 0) + dist;
 
-  // прицілювання: стрілки задають напрямок вогню (8 напрямків, з діагоналями),
-  // гра лише м'яко «доводить» ствол до ворога в межах ±20° від ТВОГО напрямку
-  const ax = (keys.aimRight ? 1 : 0) - (keys.aimLeft ? 1 : 0);
-  const ay = (keys.aimDown ? 1 : 0) - (keys.aimUp ? 1 : 0);
-  let wantFire = false;
-  if (ax || ay) {
-    player.turretAngle = coneAssist(Math.atan2(ay, ax));
-    wantFire = true;
-    touchMode = false;
-  } else if (keys.fire) {
-    // пробіл — вогонь по ходу корпусу; на тачі — автоприціл (немає стрілок)
-    player.turretAngle = touchMode ? autoAngle() : coneAssist(DIR_ANGLE[player.dir]);
-    wantFire = true;
-  } else {
-    player.turretAngle = DIR_ANGLE[player.dir]; // башта дивиться по ходу
-  }
+  // куди дивиться корпус — туди й стріляємо; м'яке доведення ±20° прощає дрібні промахи
+  // (на тачі — автоприціл, бо там нема точного керування)
+  player.turretAngle = keys.fire && touchMode
+    ? autoAngle()
+    : coneAssist(DIR_ANGLE[player.dir]);
 
-  if (wantFire && player.cooldown <= 0) {
+  if (keys.fire && player.cooldown <= 0) {
     shoot(player, true);
     player.cooldown = player.fireCd;
   }
@@ -1081,8 +1385,9 @@ function updatePlayer(dt) {
 // ствол чіпляється за нього; якщо ні — стріляємо рівно куди натиснуто
 function coneAssist(base) {
   let best = base, bestDiff = 0.35;
+  const maxDist = battle.mod === 'fog' ? 300 : 500;
   const consider = (x, y) => {
-    if (Math.hypot(x - player.x, y - player.y) > 500) return;
+    if (Math.hypot(x - player.x, y - player.y) > maxDist) return;
     const ang = Math.atan2(y - player.y, x - player.x);
     const diff = Math.abs(((ang - base + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
     if (diff < bestDiff && hasLOS(player.x, player.y, x, y)) { bestDiff = diff; best = ang; }
@@ -1410,6 +1715,17 @@ function draw() {
     ctx.fillText(d.kind === 'med' ? '💊' : d.kind === 'star' ? '⭐' : '❄️', d.x, d.y);
   }
 
+  // міни (ледь помітні — дивись уважно!)
+  for (const m of battle.mines) {
+    ctx.globalAlpha = 0.75;
+    ctx.font = '13px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ff4d5e';
+    ctx.fillText('☢', m.x, m.y);
+    ctx.globalAlpha = 1;
+  }
+
   drawTank(player, '#39ff88', true); // гравець завжди зелений, щоб не плутати з ворогами
   for (const e of enemies) if (!e.dead) drawTank(e, e.color, false);
 
@@ -1471,6 +1787,41 @@ function draw() {
     }
     ctx.globalAlpha = 1;
   }
+
+  // мітки артобстрілу — тікай з-під них!
+  for (const s of battle.strikes) {
+    const blink = Math.floor(s.t / 120) % 2;
+    ctx.strokeStyle = blink ? '#ff4d5e' : '#ffd23f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 26 * (s.t / 1400) + 8, 0, 7);
+    ctx.stroke();
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ff4d5e';
+    ctx.fillText('⌖', s.x, s.y);
+  }
+
+  // нічний бій: темрява, видно лише навколо танка
+  if (battle.mod === 'night') {
+    const ng = ctx.createRadialGradient(player.x, player.y, 70, player.x, player.y, 210);
+    ng.addColorStop(0, 'rgba(2,4,10,0)');
+    ng.addColorStop(1, 'rgba(2,4,10,0.9)');
+    ctx.fillStyle = ng;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // туман: серпанок
+  if (battle.mod === 'fog') {
+    ctx.fillStyle = 'rgba(170,190,210,0.15)';
+    ctx.fillRect(0, 0, W, H);
+  }
+  // мороз: холодний відтінок
+  if (battle.mod === 'frost') {
+    ctx.fillStyle = 'rgba(150,200,255,0.07)';
+    ctx.fillRect(0, 0, W, H);
+  }
+
   ctx.restore();
   drawHud(); // поверх усього, без тремтіння екрана
 }
@@ -1490,7 +1841,8 @@ function drawHud() {
   const left = battle.mode === 'assault'
     ? `🎯 ШТАБ: ${battle.hqLeft}`
     : `🎯 ${spawnQueue.length + enemies.filter(e => !e.dead).length}`;
-  ctx.fillText(`⚔ ${battle.frags}   ${left}`, 12, 19);
+  const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
+  ctx.fillText(`⚔ ${battle.frags}   ${left}${modIco}`, 12, 19);
 
   // центр: таймер постачання
   const msLeft = Math.max(0, SUPPLY_MS - battle.supply);
@@ -1558,11 +1910,11 @@ function drawHud() {
     ctx.font = '15px monospace';
     ctx.fillStyle = '#d7e0f0';
     ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ ×2' : ''), W / 2, H / 2 + 16);
-    if (battle.mode === 'assault') {
-      ctx.fillStyle = '#8fa2c4';
-      ctx.font = '13px monospace';
-      ctx.fillText('Вороги нескінченні — прорвися і знеси штаб', W / 2, H / 2 + 40);
-    }
+    ctx.fillStyle = '#8fa2c4';
+    ctx.font = '13px monospace';
+    let sub = battle.mode === 'assault' ? 'Вороги нескінченні — прорвися і знеси штаб' : '';
+    if (battle.mod) sub = (sub ? sub + '  ·  ' : '') + MOD_INFO[battle.mod].ico + ' ' + MOD_INFO[battle.mod].name + ': ' + MOD_INFO[battle.mod].desc;
+    if (sub) ctx.fillText(sub, W / 2, H / 2 + 40);
     ctx.globalAlpha = 1;
   }
   ctx.restore();
@@ -1573,7 +1925,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(50, now - lastTime);
   lastTime = now;
-  if (state !== 'play') { if (state === 'perk' || state === 'results') draw(); return; }
+  if (state !== 'play') { if (state === 'perk' || state === 'results' || state === 'pause') draw(); return; }
 
   if (shakeTime > 0) shakeTime -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
@@ -1596,6 +1948,8 @@ function loop(now) {
     return;
   }
 
+  updateModifiers(dt);
+  if (state !== 'play') return;
   updatePlayer(dt);
   if (state !== 'play') return; // бій міг закінчитися
   trySpawnEnemy(dt);
@@ -1660,9 +2014,6 @@ function renderHangar() {
   }
 
   renderTankDetail();
-
-  const elite = (save.battles + 1) % 5 === 0;
-  document.getElementById('eliteBanner').classList.toggle('hidden', !elite);
 }
 
 function tankNodeClick(id) {
@@ -1783,18 +2134,42 @@ function flashMsg(text) {
 }
 
 // ---------- Ввід ----------
-// WASD — рух корпусу; СТРІЛКИ — вогонь у напрямку (twin-stick без мишки)
+// Класика: куди дивиться танк — туди й стріляє
 const KEYMAP = {
-  KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
-  ArrowUp: 'aimUp', ArrowDown: 'aimDown', ArrowLeft: 'aimLeft', ArrowRight: 'aimRight',
+  ArrowUp: 'up', KeyW: 'up',
+  ArrowDown: 'down', KeyS: 'down',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
   Space: 'fire',
 };
+
+function pauseGame() {
+  state = 'pause';
+  keys = {};
+  document.getElementById('pauseOverlay').classList.remove('hidden');
+}
+function resumeGame() {
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  state = 'play';
+  lastTime = performance.now();
+}
+function quitBattle() {
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  endBattle(false);
+}
 
 document.addEventListener('keydown', e => {
   if (KEYMAP[e.code] && state === 'play') { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
   if (e.code === 'KeyE' && state === 'play') useMedkit();
+  if (e.code === 'KeyM') toggleMusic();
   if (e.code === 'Enter' && state === 'results') toHangar();
-  if (e.code === 'Escape' && state === 'play') endBattle(false);
+  if (e.code === 'Escape') {
+    if (state === 'play') pauseGame();
+    else if (state === 'pause') resumeGame();
+    else if (state === 'front') frontToHangar();
+  }
+  if (e.code === 'Enter' && state === 'pause') resumeGame();
+  if (e.code === 'KeyQ' && state === 'pause') quitBattle();
   if (state === 'perk' && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) {
     const idx = +e.code.slice(-1) - 1;
     const picks = window._perkPicks || [];
@@ -1803,8 +2178,13 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
 
-document.getElementById('battleBtn').onclick = startBattle;
+document.getElementById('battleBtn').onclick = () => { startMusic(); showFront(); };
+document.getElementById('freeBattleBtn').onclick = () => { startMusic(); startBattle(null); };
+document.getElementById('backHangarBtn').onclick = frontToHangar;
+document.getElementById('resumeBtn').onclick = resumeGame;
+document.getElementById('quitBtn').onclick = quitBattle;
 document.getElementById('toHangarBtn').onclick = toHangar;
+document.getElementById('musicBtn').onclick = toggleMusic;
 document.getElementById('logBtn').onclick = async () => {
   const log = getLog();
   if (!log.length) { flashMsg('Лог порожній — зіграй хоча б один бій!'); return; }
