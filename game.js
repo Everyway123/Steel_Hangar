@@ -143,7 +143,7 @@ const MAPS = [
     '.@............@.',
     '....########....',
     '....#......#....',
-    '..#..........#..',
+    '..#..x....x..#..',
     '..#...####...#..',
     '......#..#......',
     '..##..#..#..##..',
@@ -158,7 +158,7 @@ const MAPS = [
     '.......#..#..##.',
     '.###..........#.',
     '...#..@##@..###.',
-    '.#............#.',
+    '.#..f......f..#.',
     '.#..###..###....',
     '.......##.......',
     '.###..*##*..###.',
@@ -169,7 +169,7 @@ const MAPS = [
   { name: 'Річкова переправа', mode: 'clear', map: [
     'E......EE......E',
     '................',
-    '..##........##..',
+    '..##...ii...##..',
     '..##..~~~~..##..',
     '.....~~~~~~.....',
     '.~~~~~....~~~~~.',
@@ -192,7 +192,7 @@ const MAPS = [
     '....##.@@.##....',
     '.@............@.',
     '..####....####..',
-    '..#..........#..',
+    '..#....T.....#..',
     '..#..*####*..#..',
     '.....*#..#*.....',
     '................',
@@ -243,6 +243,54 @@ const MAPS = [
     '..o..........o..',
     '..###..##..###..',
     '.....o....o.....',
+    '................',
+    '.......P........',
+  ]},
+  { name: 'Залізний хрест', mode: 'clear', map: [
+    'E......EE......E',
+    '................',
+    '..##...xx...##..',
+    '..##...xx...##..',
+    '.......ff.......',
+    '.x..f######f..x.',
+    '....f.#..#.f....',
+    '....f.#T.#.f....',
+    '....f.#..#.f....',
+    '.x..f######f..x.',
+    '.......ff.......',
+    '..##...xx...##..',
+    '................',
+    '.......P........',
+  ]},
+  { name: 'Крижане озеро', mode: 'clear', map: [
+    'E......EE......E',
+    '................',
+    '..**..iiii..**..',
+    '..*..iiiiii..*..',
+    '....iiiiiiii....',
+    '.@..iiiiiiii..@.',
+    '....iiixxiii....',
+    '....iiixxiii....',
+    '....iiiiiiii....',
+    '.#..iiiiiiii..#.',
+    '..#..iiiiii..#..',
+    '..**..iiii..**..',
+    '................',
+    '.......P........',
+  ]},
+  { name: 'Лінія оборони', mode: 'assault', map: [
+    'E.....@HH@.....E',
+    '.......##.......',
+    '..T..........T..',
+    '................',
+    'xx.xx.xx.xx.xx.x',
+    '................',
+    '.####.f..f.####.',
+    '......f..f......',
+    '......f..f......',
+    '......ff.f......',
+    'x.xx.xx.xx.xx.xx',
+    '................',
     '................',
     '.......P........',
   ]},
@@ -298,9 +346,11 @@ const FRONT_SECTORS = [
   { id: 'pisky',       name: 'Піски',             x: 37, y: 10, map: 'Пустельний рубіж',     mode: 'clear',   mod: 'night',     reward: 700,  links: ['fort'] },
   { id: 'mist',        name: 'Міст',              x: 37, y: 50, map: 'Річкова переправа',    mode: 'clear',   mod: 'fog',       reward: 700,  links: ['fort'] },
   { id: 'sklady',      name: 'Склади',            x: 37, y: 90, map: 'Склад боєприпасів',    mode: 'clear',   mod: 'artillery', reward: 700,  links: ['radar'] },
-  { id: 'fort',        name: 'Форт «Сталь»',      x: 53, y: 28, map: 'Сталева фортеця',      mode: 'clear',   mod: 'mines',     reward: 1100, links: ['kotel', 'ksh'] },
-  { id: 'radar',       name: 'Радарна база',      x: 53, y: 74, map: 'Штурм: Радарна база',  mode: 'assault', mod: 'fog',       reward: 1200, links: ['ksh'] },
-  { id: 'kotel',       name: 'Котел',             x: 69, y: 14, map: 'Арена генерала',       mode: 'clear',   mod: 'frost',     reward: 1800, boss: true, links: ['zavod'] },
+  { id: 'fort',        name: 'Форт «Сталь»',      x: 51, y: 28, map: 'Сталева фортеця',      mode: 'clear',   mod: 'mines',     reward: 1100, links: ['ozero', 'ksh'] },
+  { id: 'radar',       name: 'Радарна база',      x: 51, y: 74, map: 'Штурм: Радарна база',  mode: 'assault', mod: 'fog',       reward: 1200, links: ['liniya'] },
+  { id: 'liniya',      name: 'Лінія оборони',     x: 63, y: 88, map: 'Лінія оборони',        mode: 'assault', mod: 'artillery', reward: 1700, links: ['ksh'] },
+  { id: 'ozero',       name: 'Крижане озеро',     x: 63, y: 8,  map: 'Крижане озеро',        mode: 'clear',   mod: 'frost',     reward: 1500, links: ['kotel'] },
+  { id: 'kotel',       name: 'Котел',             x: 76, y: 12, map: 'Залізний хрест',       mode: 'clear',   mod: null,        reward: 1800, boss: true, links: ['zavod'] },
   { id: 'ksh',         name: 'Командний центр',   x: 71, y: 56, map: 'Штурм: Командний центр', mode: 'assault', mod: 'night',   reward: 1600, links: ['zavod'] },
   { id: 'zavod',       name: 'Танковий завод',    x: 84, y: 32, map: 'Склад боєприпасів',    mode: 'assault', mod: 'artillery', reward: 2400, links: ['tsytadel'] },
   { id: 'tsytadel',    name: '☭ ЦИТАДЕЛЬ',        x: 93, y: 68, map: 'Арена генерала',       mode: 'assault', mod: 'mines',     reward: 5000, boss: true, final: true, links: [] },
@@ -374,7 +424,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const TILE = 40, COLS = 16, ROWS = 14;
 const W = COLS * TILE, H = ROWS * TILE;
-const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7;
+const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7, T_HEDGE = 8, T_FENCE = 9, T_ICE = 10, T_TURRET = 11;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 let grid, gridHp, player, enemies, bullets, particles, drops;
@@ -570,6 +620,10 @@ function startBattle(sector) {
       else if (ch === '~') t = T_WATER;
       else if (ch === '*') t = T_BUSH;
       else if (ch === 's') t = T_SAND;
+      else if (ch === 'x') t = T_HEDGE;
+      else if (ch === 'f') { t = T_FENCE; hp = 1; }
+      else if (ch === 'i') t = T_ICE;
+      else if (ch === 'T') { t = T_TURRET; hp = 10 + 4 * st.tier; }
       else if (ch === 'o') { t = T_BARREL; hp = 1; }
       else if (ch === 'H') { t = T_HQ; hp = 14 + 5 * st.tier; }
       else if (ch === 'P') { player.x = c * TILE + TILE / 2; player.y = r * TILE + TILE / 2; }
@@ -581,6 +635,12 @@ function startBattle(sector) {
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
       if (grid[r][c] === T_HQ) battle.hqLeft++;
+
+  // ДОТи: збираємо список турелей
+  battle.turrets = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    if (grid[r][c] === T_TURRET)
+      battle.turrets.push({ r, c, x: c * TILE + TILE / 2, y: r * TILE + TILE / 2, cd: 1500 + Math.random() * 800, ang: Math.PI / 2 });
 
   // мінне поле: розкидаємо міни по вільних клітинах подалі від спавну гравця
   if (battle.mod === 'mines') {
@@ -633,8 +693,9 @@ function scaledEnemy(typeName, tier) {
 function solidAt(x, y, forBullet) {
   if (x < 0 || y < 0 || x >= W || y >= H) return true;
   const t = grid[Math.floor(y / TILE)][Math.floor(x / TILE)];
-  if (t === T_EMPTY || t === T_BUSH || t === T_SAND) return false;
+  if (t === T_EMPTY || t === T_BUSH || t === T_SAND || t === T_ICE) return false;
   if (t === T_WATER) return !forBullet;
+  if (t === T_HEDGE) return !forBullet; // кулі летять над їжаками
   return true;
 }
 function tileAt(x, y) {
@@ -674,8 +735,22 @@ function crushBricks(x, y, size) {
   }
 }
 
+function crushFences(x, y, size) {
+  const h = size / 2;
+  const r1 = Math.max(0, Math.floor((y - h) / TILE)), r2 = Math.min(ROWS - 1, Math.floor((y + h) / TILE));
+  const c1 = Math.max(0, Math.floor((x - h) / TILE)), c2 = Math.min(COLS - 1, Math.floor((x + h) / TILE));
+  for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
+    if (grid[r][c] === T_FENCE) {
+      grid[r][c] = T_EMPTY;
+      spawnParticles(c * TILE + TILE / 2, r * TILE + TILE / 2, '#a5814f', 10);
+      sfx.brick();
+    }
+  }
+}
+
 function moveTank(tank, dir, dist) {
   const [dx, dy] = DIRS[dir];
+  crushFences(tank.x + dx * (dist + 3), tank.y + dy * (dist + 3), tank.size);
   if (tank.type === 'boss') crushBricks(tank.x + dx * (dist + 4), tank.y + dy * (dist + 4), tank.size);
   if (tank.dir !== dir) {
     if (dx !== 0) tank.y = snapIfFree(tank, tank.x, tank.y, 'y');
@@ -799,7 +874,7 @@ function updateEnemy(e, dt) {
   }
   if (e.flash > 0) e.flash -= dt;
   if (e.slowT > 0) e.slowT -= dt;
-  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.7 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
+  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.7 : tileAt(e.x, e.y) === T_ICE ? 1.25 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
   if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
   else e.tread = (e.tread || 0) + eSpeed;
 
@@ -898,6 +973,24 @@ function updateBullets(dt) {
 
     const c = Math.floor(b.x / TILE), r = Math.floor(b.y / TILE);
     const t = b.over ? T_EMPTY : (grid[r] && grid[r][c]); // навісні летять над стінами
+    if (t === T_FENCE) {
+      b.dead = true;
+      grid[r][c] = T_EMPTY;
+      spawnParticles(b.x, b.y, '#a5814f', 8);
+      sfx.brick();
+      continue;
+    }
+    if (t === T_TURRET) {
+      b.dead = true;
+      if (b.fromPlayer) {
+        gridHp[r][c] -= b.dmg;
+        battle.dmgDealt += b.dmg;
+        sfx.hit();
+        spawnParticles(b.x, b.y, '#8a97ad', 6);
+        if (gridHp[r][c] <= 0) destroyTurret(r, c);
+      }
+      continue;
+    }
     if (t === T_BARREL) {
       b.dead = true;
       explodeBarrel(r, c);
@@ -1032,6 +1125,35 @@ function explodeBarrel(r, c) {
     if (!grid[rr]) continue;
     if (grid[rr][cc] === T_BRICK) grid[rr][cc] = T_EMPTY;
     else if (grid[rr][cc] === T_BARREL) explodeBarrel(rr, cc);
+  }
+}
+
+function destroyTurret(r, c) {
+  grid[r][c] = T_EMPTY;
+  battle.turrets = battle.turrets.filter(t => !(t.r === r && t.c === c));
+  const bx = c * TILE + TILE / 2, by = r * TILE + TILE / 2;
+  sfx.boom();
+  shakeTime = 250;
+  spawnParticles(bx, by, '#8a97ad', 20);
+  if (!(battle.mode === 'assault' && battle.frags > 30)) {
+    battle.credits += 150;
+    battle.xp += 25;
+  }
+  floatText(bx, by, 'ДОТ ЗНИЩЕНО! +150 🪙', '#ffd23f');
+}
+
+function updateTurrets(dt) {
+  for (const t of battle.turrets) {
+    const dist = Math.hypot(player.x - t.x, player.y - t.y);
+    t.ang = Math.atan2(player.y - t.y, player.x - t.x);
+    t.cd -= dt;
+    if (t.cd <= 0 && (battle.enemyShotCd || 0) <= 0 && dist < 420 && hasLOS(t.x, t.y, player.x, player.y)) {
+      const ang = t.ang + (Math.random() - 0.5) * 0.2;
+      bullets.push({ x: t.x + Math.cos(ang) * 24, y: t.y + Math.sin(ang) * 24, dx: Math.cos(ang), dy: Math.sin(ang), speed: 3.8, dmg: 3, fromPlayer: false });
+      sfx.shoot();
+      t.cd = 1500 + Math.random() * 500;
+      battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+    }
   }
 }
 
@@ -1407,7 +1529,17 @@ function updatePlayer(dt) {
   // пісок сповільнює наполовину, мороз — усіх на 20%
   const sandMult = tileAt(player.x, player.y) === T_SAND ? 0.7 : 1;
   const dist = player.speed * sandMult * accel * (battle.speedMult || 1) * dt / 16.67;
-  if (dir && moveTank(player, dir, dist)) player.tread = (player.tread || 0) + dist;
+  const onIce = tileAt(player.x, player.y) === T_ICE;
+  if (dir && moveTank(player, dir, dist)) {
+    player.tread = (player.tread || 0) + dist;
+    player.glide = onIce ? dist : 0;
+  } else if (!dir && onIce && player.glide > 0.06) {
+    // лід: танк ковзає за інерцією
+    moveTank(player, player.dir, player.glide);
+    player.glide *= 0.955;
+  } else if (!dir) {
+    player.glide = 0;
+  }
 
   // куди дивиться корпус — туди й стріляємо; м'яке доведення ±20° прощає дрібні промахи
   // (на тачі — автоприціл, бо там нема точного керування)
@@ -1547,6 +1679,69 @@ function drawTile(r, c) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('☢', x + 20, y + 20);
+  } else if (t === T_HEDGE) {
+    // протитанковий їжак: сталевий хрест, кулі летять над ним
+    ctx.strokeStyle = '#5c687e';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 8); ctx.lineTo(x + TILE - 8, y + TILE - 8);
+    ctx.moveTo(x + TILE - 8, y + 8); ctx.lineTo(x + 8, y + TILE - 8);
+    ctx.stroke();
+    ctx.strokeStyle = '#aab6cc';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 8); ctx.lineTo(x + TILE - 8, y + TILE - 8);
+    ctx.moveTo(x + TILE - 8, y + 8); ctx.lineTo(x + 8, y + TILE - 8);
+    ctx.stroke();
+  } else if (t === T_FENCE) {
+    // дерев'яний паркан: трощиться корпусом і кулями
+    ctx.fillStyle = '#7a5a33';
+    ctx.fillRect(x + 2, y + 4, TILE - 4, TILE - 8);
+    ctx.fillStyle = '#5c421f';
+    for (let i = 0; i < 4; i++) ctx.fillRect(x + 4 + i * 9, y + 4, 2, TILE - 8);
+    ctx.fillStyle = '#9c7a4b';
+    ctx.fillRect(x + 2, y + 10, TILE - 4, 3);
+    ctx.fillRect(x + 2, y + TILE - 14, TILE - 4, 3);
+  } else if (t === T_ICE) {
+    // лід: ковзко!
+    ctx.fillStyle = '#8ec6e8';
+    ctx.fillRect(x, y, TILE, TILE);
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.fillRect(x + ((r * 11 + c * 7) % 18), y + ((r * 5 + c * 13) % 22), 12, 2);
+    ctx.fillRect(x + ((r * 3 + c * 17) % 24), y + ((r * 13 + c * 3) % 28), 8, 2);
+    ctx.strokeStyle = 'rgba(120,170,210,.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + ((r * 7 + c) % 30), y);
+    ctx.lineTo(x + ((c * 9 + r) % 30), y + TILE);
+    ctx.stroke();
+  } else if (t === T_TURRET) {
+    // ворожий ДОТ
+    ctx.fillStyle = '#2a3245';
+    ctx.fillRect(x, y, TILE, TILE);
+    const tur = battle.turrets && battle.turrets.find(tt => tt.r === r && tt.c === c);
+    const cx = x + TILE / 2, cy = y + TILE / 2;
+    ctx.fillStyle = '#4a5670';
+    ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#8a97ad'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.stroke();
+    // дуло за ціллю
+    if (tur) {
+      ctx.strokeStyle = '#c3cddf'; ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(tur.ang) * 19, cy + Math.sin(tur.ang) * 19);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ff4d5e';
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fill();
+    // смужка HP
+    const maxHp = 10 + 4 * battle.tank.tier;
+    const frac = Math.max(0, gridHp[r][c] / maxHp);
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(x + 2, y - 7, TILE - 4, 5);
+    ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
+    ctx.fillRect(x + 2, y - 7, (TILE - 4) * frac, 5);
   } else if (t === T_HQ) {
     ctx.fillStyle = '#2a1a22';
     ctx.fillRect(x, y, TILE, TILE);
@@ -2084,6 +2279,7 @@ function loop(now) {
 
   updateModifiers(dt);
   if (state !== 'play') return;
+  updateTurrets(dt);
   updatePlayer(dt);
   if (state !== 'play') return; // бій міг закінчитися
   trySpawnEnemy(dt);
