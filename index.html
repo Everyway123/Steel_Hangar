@@ -131,6 +131,11 @@
   .card .nm { color: var(--gold); font-size: 14px; margin: 8px 0 6px; font-weight: bold; }
   .card .ds { color: var(--dim); font-size: 11px; line-height: 1.4; }
   .card .key { color: var(--neon); font-size: 11px; margin-top: 8px; }
+  .card .rar { font-size: 10px; letter-spacing: 1px; margin-bottom: 4px; }
+  .card.rare { border-color: var(--blue); }
+  .card.rare .rar { color: var(--blue); }
+  .card.epic { border-color: #c07eff; box-shadow: 0 0 14px rgba(192,126,255,.4); }
+  .card.epic .rar { color: #c07eff; }
   #resultTable { margin: 10px auto; font-size: 14px; text-align: left; }
   #resultTable td { padding: 3px 12px; }
   #resultTable td:last-child { color: var(--gold); text-align: right; }
@@ -203,8 +208,8 @@
     <canvas id="game" width="640" height="560"></canvas>
 
     <div id="perkOverlay" class="overlay hidden">
-      <h2>ТАКТИЧНА ПЕРЕВАГА!</h2>
-      <p class="sub">3 фраги поспіль — обери бонус на цей бій:</p>
+      <h2>📦 ПОСТАЧАННЯ ПРИБУЛО!</h2>
+      <p class="sub">Обери доктрину на цей бій (рідкісні — сила за ціну):</p>
       <div id="cards"></div>
     </div>
 
@@ -222,19 +227,21 @@
     <div class="statRow"><span>Фраги</span><span class="val" id="uiFrags">0</span></div>
     <div class="statRow"><span>Ворогів лишилось</span><span class="val" id="uiEnemies">0</span></div>
     <div class="statRow"><span>Рикошети</span><span class="val" id="uiRico">0</span></div>
+    <div class="statRow"><span>🔧 Аптечка [E]</span><span class="val" id="uiMed">✅ готова</span></div>
     <div class="label">HP</div>
     <div class="barWrap"><div class="bar" id="hpBar" style="width:100%"></div></div>
-    <div class="label">До тактичної переваги</div>
+    <div class="label">До постачання доктрини</div>
     <div class="barWrap"><div class="bar" id="perkBar" style="width:0%"></div></div>
     <div id="perkList"></div>
     <div id="controlsHint">
       WASD / стрілки — рух<br>
       Пробіл — вогонь (автоприціл сам веде башту)<br>
+      E — аптечка (одна на бій!)<br>
       Esc — покинути бій<br>
-      💊 аптечка · ⭐ срібло · ❄ заморозка<br>
+      📦 доктрина прибуває раз на ~55 с<br>
       ☢ бочки вибухають — підривай ворогів!<br>
       🏜 пісок сповільнює всіх<br>
-      Ховайся за стінами — вороги стріляють лише коли бачать тебе
+      Ховайся за стінами, але не стій довго — навідник накриє!
     </div>
   </div>
 </div>
@@ -245,7 +252,10 @@
     <div class="tbtn" data-dir="left">◀</div><div></div><div class="tbtn" data-dir="right">▶</div>
     <div></div><div class="tbtn" data-dir="down">▼</div><div></div>
   </div>
-  <div class="tbtn" id="fireBtn">💥</div>
+  <div style="display:flex;flex-direction:column;gap:8px;align-self:center;pointer-events:auto">
+    <div class="tbtn" id="medBtn" style="width:54px;height:54px;border-radius:50%">🔧</div>
+    <div class="tbtn" id="fireBtn">💥</div>
+  </div>
 </div>
 
 <script src="game.js"></script>
