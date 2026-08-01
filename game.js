@@ -565,7 +565,7 @@ function startBattle(sector) {
     for (let c = 0; c < COLS; c++) {
       const ch = row[c];
       let t = T_EMPTY, hp = 0;
-      if (ch === '#') { t = T_BRICK; hp = 2; }
+      if (ch === '#') { t = T_BRICK; hp = 4; }
       else if (ch === '@') { t = T_STEEL; hp = 6; }
       else if (ch === '~') t = T_WATER;
       else if (ch === '*') t = T_BUSH;
@@ -786,7 +786,8 @@ function updateEnemy(e, dt) {
   if (e.thinkTimer <= 0) {
     e.thinkTimer = 400 + Math.random() * 1200;
     const ddx = player.x - e.x, ddy = player.y - e.y;
-    if (Math.random() < 0.72) {
+    const chase = Math.hypot(ddx, ddy) < 300 ? 0.88 : 0.72; // поблизу — липнуть до тебе
+    if (Math.random() < chase) {
       e.wantDir = Math.abs(ddx) > Math.abs(ddy)
         ? (ddx > 0 ? 'right' : 'left')
         : (ddy > 0 ? 'down' : 'up');
@@ -814,16 +815,26 @@ function updateEnemy(e, dt) {
     const diff = Math.abs(((angP - facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
     const los = dist < range && hasLOS(e.x, e.y, player.x, player.y);
 
+    // впритул конус ширший — в упор не промахуються
+    const cone = dist < 150 ? 1.1 : 0.35;
+
     if (e.homing && los) {
       // ракетник: повільна самонавідна ракета — ухиляйся або збивай!
       e.turretAngle = angP;
       fireBullet(e, facing, 3.0, e.dmg, false);
       bullets[bullets.length - 1].homing = 'player';
       e.cooldown = e.fireCd + Math.random() * 600;
-    } else if (los && diff < 0.35) {
+    } else if (los && diff < cone) {
       e.turretAngle = angP;
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
       e.cooldown = e.fireCd + Math.random() * 400;
+    } else if (los) {
+      // бачить, але не дивиться на тебе — розвертається до бою
+      const ddx = player.x - e.x, ddy = player.y - e.y;
+      e.wantDir = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
+      e.dir = e.wantDir;
+      e.thinkTimer = 300;
+      e.cooldown = 300;
     } else if (dist < range && battle.idle > 10000) {
       // анти-кемпінг: по нерухомому гравцю б'ють навісом через стіни
       if (!battle.arcWarned) {
@@ -898,17 +909,14 @@ function updateBullets(dt) {
     if (t === T_BRICK || t === T_STEEL) {
       b.dead = true;
       if (t === T_BRICK) {
-        gridHp[r][c] -= Math.max(1, b.dmg);
+        // цегла міцніша: гравець зносить максимум по 3, вороги — по 1,
+        // щоб карта не перетворювалась на голе поле
+        gridHp[r][c] -= b.fromPlayer ? Math.min(3, Math.max(1, b.dmg)) : 1;
         sfx.brick();
         spawnParticles(b.x, b.y, '#c9694a', 6);
         if (gridHp[r][c] <= 0) grid[r][c] = T_EMPTY;
       } else {
-        // сталь пробивається лише уроном 5+
-        if (b.fromPlayer && b.dmg >= 5) {
-          gridHp[r][c] -= b.dmg;
-          spawnParticles(b.x, b.y, '#aab6cc', 8);
-          if (gridHp[r][c] <= 0) grid[r][c] = T_EMPTY;
-        }
+        // сталь незламна — постійні укриття мають лишатися до кінця бою
         sfx.hit();
       }
       continue;
@@ -962,7 +970,7 @@ function updateBullets(dt) {
         const dmg = Math.max(1, Math.round(b.dmg - player.armor * 0.7));
         player.hp -= dmg;
         battle.dmgTaken += dmg;
-        player.invuln = player.smoke ? 2000 : 600; // димова завіса подовжує невразливість
+        player.invuln = player.smoke ? 2000 : 450; // димова завіса подовжує невразливість
         shakeTime = 180;
         sfx.hit();
         floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
