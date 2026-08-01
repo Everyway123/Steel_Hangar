@@ -336,8 +336,8 @@ function buildRoster(tier, elite) {
 const SUPPLY_MS = 45000;
 const PERKS = [
   // польові — прості, але відчутні
-  { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+40% срібла за кожен фраг до кінця бою',
-    apply: p => battle.lootMult = (battle.lootMult || 1) * 1.4 },
+  { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+60% срібла за кожен фраг до кінця бою',
+    apply: p => battle.lootMult = (battle.lootMult || 1) * 1.6 },
   { id: 'cryo',    rar: 'common', ico: '❄', name: 'Кріо-снаряди',      desc: 'Твої влучання ЗАМОРОЖУЮТЬ ворога на 2 с',
     apply: p => p.cryo = true },
   { id: 'forsazh', rar: 'common', ico: '🚀', name: 'Форсаж',            desc: '+25% швидкості — літай між укриттями',
@@ -347,8 +347,8 @@ const PERKS = [
   // тактичні — міняють стиль гри
   { id: 'trofey',  rar: 'rare', ico: '🔧', name: 'Трофейщик',          desc: 'Кожен фраг ЛІКУЄ тебе на 2 HP',
     apply: p => p.vampire = true },
-  { id: 'taran',   rar: 'rare', ico: '🥊', name: 'Таран',              desc: 'Твій корпус — зброя: зіткнення б\'є ворога на 6',
-    apply: p => p.ram = true },
+  { id: 'taran',   rar: 'rare', ico: '🥊', name: 'Таран',              desc: 'Корпус — зброя: зіткнення б\'є на 10, і +10% швидкості',
+    apply: p => { p.ram = true; p.speed *= 1.1; } },
   { id: 'reactive', rar: 'rare', ico: '🛡', name: 'Реактивна броня',   desc: '+1 броня, рикошет ВІДБИВАЄ снаряд у ворога',
     apply: p => { p.armor += 1; p.reflect = true; } },
   { id: 'zatvor',  rar: 'rare', ico: '⚡', name: 'Блискавичний затвор', desc: 'Перезарядка на 30% швидша',
@@ -799,7 +799,7 @@ function updateEnemy(e, dt) {
   }
   if (e.flash > 0) e.flash -= dt;
   if (e.slowT > 0) e.slowT -= dt;
-  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.55 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
+  const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.7 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
   if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
   else e.tread = (e.tread || 0) + eSpeed;
 
@@ -1088,7 +1088,7 @@ function endBattle(victory) {
   if (state === 'results') return;
   state = 'results';
 
-  const mult = battle.tierMult * (battle.elite ? 2 : 1);
+  const mult = battle.tierMult * (battle.elite ? 1.7 : 1);
   const winBonus = victory ? Math.round((battle.mode === 'assault' ? 350 : 250) * battle.tank.tier) : 0;
   const creditsEarned = Math.round((battle.credits * mult + winBonus) * (1 + (battle.tank.radioBonus || 0) + frontBonus()));
 
@@ -1121,7 +1121,7 @@ function endBattle(victory) {
 
   logEvent('battle_end', {
     tank: battle.tank.id, tier: battle.tank.tier, map: battle.mapName, mode: battle.mode,
-    elite: battle.elite, victory,
+    elite: battle.elite, victory, quit: !!battle.quit,
     sec: Math.round(battle.gameMs / 1000),
     frags: battle.frags, dmg: Math.round(battle.dmgDealt), taken: Math.round(battle.dmgTaken),
     rico: battle.ricochets, medUsed: !battle.medkit,
@@ -1405,7 +1405,7 @@ function updatePlayer(dt) {
   const accel = 0.35 + 0.65 * Math.min(1, player.accelMs / player.ramp);
 
   // пісок сповільнює наполовину, мороз — усіх на 20%
-  const sandMult = tileAt(player.x, player.y) === T_SAND ? 0.55 : 1;
+  const sandMult = tileAt(player.x, player.y) === T_SAND ? 0.7 : 1;
   const dist = player.speed * sandMult * accel * (battle.speedMult || 1) * dt / 16.67;
   if (dir && moveTank(player, dir, dist)) player.tread = (player.tread || 0) + dist;
 
@@ -1428,8 +1428,8 @@ function updatePlayer(dt) {
         if (e.dead || e.spawning > 0) continue;
         if (Math.abs(e.x - player.x) < (e.size + player.size) / 2 + 5 &&
             Math.abs(e.y - player.y) < (e.size + player.size) / 2 + 5) {
-          e.hp -= 6;
-          battle.dmgDealt += 6;
+          e.hp -= 10;
+          battle.dmgDealt += 10;
           player.ramCd = 1000;
           shakeTime = 150;
           sfx.boom();
@@ -2154,7 +2154,9 @@ function renderHangar() {
 // ---------- Аналітика: сама рахує статистику з локального логу ----------
 function renderAnalytics() {
   const box = document.getElementById('statsContent');
-  const ends = getLog().filter(e => e.t === 'battle_end');
+  const all = getLog().filter(e => e.t === 'battle_end');
+  const quits = all.filter(e => e.quit).length;
+  const ends = all.filter(e => !e.quit);
   if (!ends.length) {
     box.innerHTML = '<p style="color:var(--dim);font-size:12px">Зіграй перший бій — і тут з\'явиться твоя статистика: вінрейт, улюблені танки, доктрини, динаміка.</p>';
     return;
@@ -2190,7 +2192,7 @@ function renderAnalytics() {
   ).join('');
 
   box.innerHTML = `
-    <div class="statRow"><span>Боїв у логу</span><span class="val">${ends.length}</span></div>
+    <div class="statRow"><span>Боїв у логу</span><span class="val">${ends.length}${quits ? ' (+' + quits + ' виходів)' : ''}</span></div>
     <div class="statRow"><span>Вінрейт</span><span class="val">${Math.round(wins / ends.length * 100)}% (останні ${last10.length}: ${Math.round(w10 / last10.length * 100)}%)</span></div>
     <div class="statRow"><span>Сер. бій</span><span class="val">${avg('sec')}с</span></div>
     <div class="statRow"><span>Сер. фраги / отримано</span><span class="val">${avg('frags')} / ${avg('taken')}</span></div>
@@ -2342,6 +2344,7 @@ function resumeGame() {
 }
 function quitBattle() {
   document.getElementById('pauseOverlay').classList.add('hidden');
+  if (battle) battle.quit = true;
   endBattle(false);
 }
 
