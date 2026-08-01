@@ -310,11 +310,11 @@ function frontBonus() { return 0.02 * Math.max(0, (save.front.liberated.length -
 
 // ---------- Вороги ----------
 const ENEMY_TYPES = {
-  scout:   { hp: 4,  speed: 1.65, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff', cls: 'ЛТ' },
-  soldier: { hp: 7,  speed: 1.1, size: 34, dmg: 2, fireCd: 1200, credits: 85,  xp: 17, color: '#ff9d5c', cls: 'СТ' },
-  heavy:   { hp: 14, speed: 0.75, size: 36, dmg: 3, fireCd: 1100, credits: 140, xp: 28, color: '#e06666', cls: 'ВТ' },
-  rocket:  { hp: 6,  speed: 0.95, size: 34, dmg: 3, fireCd: 2800, credits: 170, xp: 32, color: '#ffd23f', cls: 'ПТ', homing: true },
-  boss:    { hp: 80, speed: 0.7, size: 48, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e', cls: 'ВТ' },
+  scout:   { hp: 3,  speed: 1.65, size: 32, dmg: 2, fireCd: 1750, credits: 55,  xp: 11, color: '#6fd3ff', cls: 'ЛТ' },
+  soldier: { hp: 6,  speed: 1.1, size: 34, dmg: 2, fireCd: 1400, credits: 85,  xp: 17, color: '#ff9d5c', cls: 'СТ' },
+  heavy:   { hp: 12, speed: 0.75, size: 36, dmg: 3, fireCd: 1300, credits: 140, xp: 28, color: '#e06666', cls: 'ВТ' },
+  rocket:  { hp: 5,  speed: 0.95, size: 34, dmg: 3, fireCd: 3300, credits: 170, xp: 32, color: '#ffd23f', cls: 'ПТ', homing: true },
+  boss:    { hp: 75, speed: 0.7, size: 48, dmg: 4, fireCd: 1000,  credits: 900, xp: 220, color: '#ff4d5e', cls: 'ВТ' },
 };
 
 function buildRoster(tier, elite) {
@@ -565,7 +565,7 @@ function startBattle(sector) {
     for (let c = 0; c < COLS; c++) {
       const ch = row[c];
       let t = T_EMPTY, hp = 0;
-      if (ch === '#') { t = T_BRICK; hp = 4; }
+      if (ch === '#') { t = T_BRICK; hp = 3; }
       else if (ch === '@') { t = T_STEEL; hp = 6; }
       else if (ch === '~') t = T_WATER;
       else if (ch === '*') t = T_BUSH;
@@ -597,7 +597,7 @@ function startBattle(sector) {
 
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
-  maxAlive = Math.min(6, 3 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
+  maxAlive = Math.min(5, 3 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -618,13 +618,13 @@ function startBattle(sector) {
 function scaledEnemy(typeName, tier) {
   const t = ENEMY_TYPES[typeName];
   const fl = (save.front && save.front.level || 1) - 1; // рівень фронту робить всіх злішими
-  const hpMult = (1 + 0.35 * (tier - 1)) * (1 + 0.3 * fl);
-  const dmgAdd = Math.floor((tier - 1) / 2) + fl;
+  const hpMult = (1 + 0.25 * (tier - 1)) * (1 + 0.3 * fl);
+  const dmgAdd = (tier <= 2 ? -1 : 0) + Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
     hp: Math.round(t.hp * hpMult), maxHp: Math.round(t.hp * hpMult),
     speed: t.speed, size: t.size,
-    dmg: t.dmg + dmgAdd, fireCd: t.fireCd,
+    dmg: Math.max(1, t.dmg + dmgAdd), fireCd: t.fireCd,
     credits: t.credits, xpVal: t.xp, color: t.color,
   };
 }
@@ -739,7 +739,9 @@ function shoot(tank, isPlayer) {
     }
   } else {
     // вороги стріляють у гравця з невеликим розкидом
-    const ang = Math.atan2(player.y - tank.y, player.x - tank.x) + (Math.random() - 0.5) * 0.24;
+    const distP = Math.hypot(player.x - tank.x, player.y - tank.y);
+    const spread = 0.12 + Math.min(0.4, distP / 900); // впритул точні, здалеку мажуть
+    const ang = Math.atan2(player.y - tank.y, player.x - tank.x) + (Math.random() - 0.5) * spread * 2;
     tank.turretAngle = ang;
     fireBullet(tank, ang, 3.6, tank.dmg, false);
   }
@@ -816,25 +818,31 @@ function updateEnemy(e, dt) {
     const los = dist < range && hasLOS(e.x, e.y, player.x, player.y);
 
     // впритул конус ширший — в упор не промахуються
-    const cone = dist < 150 ? 1.1 : 0.35;
+    const cone = dist < 120 ? 0.7 : 0.35;
 
-    if (e.homing && los) {
+    // токен вогню: вся ворожа армія стріляє не частіше разу на ~0.5с —
+    // тиск є, але п'ятеро не розстрілюють хором (класика екшн-дизайну)
+    const canFire = (battle.enemyShotCd || 0) <= 0;
+
+    if (e.homing && los && canFire) {
       // ракетник: повільна самонавідна ракета — ухиляйся або збивай!
       e.turretAngle = angP;
       fireBullet(e, facing, 3.0, e.dmg, false);
       bullets[bullets.length - 1].homing = 'player';
       e.cooldown = e.fireCd + Math.random() * 600;
-    } else if (los && diff < cone) {
+      battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+    } else if (los && diff < cone && canFire) {
       e.turretAngle = angP;
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
       e.cooldown = e.fireCd + Math.random() * 400;
-    } else if (los) {
-      // бачить, але не дивиться на тебе — розвертається до бою
+      battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+    } else if (los && dist < 300) {
+      // бачить зблизька — розвертається, але потребує часу на прицілювання
       const ddx = player.x - e.x, ddy = player.y - e.y;
       e.wantDir = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
       e.dir = e.wantDir;
-      e.thinkTimer = 300;
-      e.cooldown = 300;
+      e.thinkTimer = 400;
+      e.cooldown = 700;
     } else if (dist < range && battle.idle > 10000) {
       // анти-кемпінг: по нерухомому гравцю б'ють навісом через стіни
       if (!battle.arcWarned) {
@@ -970,7 +978,7 @@ function updateBullets(dt) {
         const dmg = Math.max(1, Math.round(b.dmg - player.armor * 0.7));
         player.hp -= dmg;
         battle.dmgTaken += dmg;
-        player.invuln = player.smoke ? 2000 : 450; // димова завіса подовжує невразливість
+        player.invuln = player.smoke ? 2000 : 600; // димова завіса подовжує невразливість
         shakeTime = 180;
         sfx.hit();
         floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
@@ -1069,7 +1077,7 @@ function killEnemy(e) {
   }
 
   const roll = Math.random();
-  if (roll < 0.10) drops.push({ x: e.x, y: e.y, kind: 'med', ttl: 9000 });
+  if (roll < 0.14) drops.push({ x: e.x, y: e.y, kind: 'med', ttl: 9000 });
   else if (roll < 0.18) drops.push({ x: e.x, y: e.y, kind: 'star', ttl: 9000 });
   else if (roll < 0.24) drops.push({ x: e.x, y: e.y, kind: 'freeze', ttl: 9000 });
 
@@ -2054,6 +2062,7 @@ function loop(now) {
 
   if (shakeTime > 0) shakeTime -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
+  if (battle.enemyShotCd > 0) battle.enemyShotCd -= dt;
   battle.gameMs += dt;
   if (battle.introT > 0) battle.introT -= dt;
 
