@@ -65,9 +65,24 @@ function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     save = raw ? JSON.parse(raw) : defaultSave();
     if (!save.tanks || !save.tanks[save.current]) save = defaultSave();
+    // стартовий танк завжди відкритий
+    const k = tankSave('kadet');
+    k.researched = true; k.owned = true;
   } catch (e) { save = defaultSave(); }
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+// ---------- Телеметрія (локальний лог для аналізу балансу) ----------
+const LOG_KEY = 'steelHangarLog1';
+function logEvent(type, data) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+    arr.push(Object.assign({ t: type, ts: Date.now() }, data));
+    while (arr.length > 300) arr.shift();
+    localStorage.setItem(LOG_KEY, JSON.stringify(arr));
+  } catch (e) {}
+}
+function getLog() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { return []; } }
 function tankSave(id) {
   if (!save.tanks[id]) save.tanks[id] = { researched: false, owned: false, xp: 0, modules: { gun: 0, armor: 0, engine: 0 } };
   return save.tanks[id];
@@ -226,15 +241,15 @@ const MAPS = [
 
 // ---------- Вороги ----------
 const ENEMY_TYPES = {
-  scout:   { hp: 2,  speed: 1.9, size: 32, dmg: 2, fireCd: 1500, credits: 70,  xp: 14, color: '#6fd3ff' },
-  soldier: { hp: 4,  speed: 1.25, size: 34, dmg: 2, fireCd: 1200, credits: 110, xp: 22, color: '#ff9d5c' },
-  heavy:   { hp: 8,  speed: 0.85, size: 36, dmg: 3, fireCd: 1100, credits: 180, xp: 36, color: '#e06666' },
-  boss:    { hp: 55, speed: 0.8, size: 56, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
+  scout:   { hp: 4,  speed: 1.9, size: 32, dmg: 2, fireCd: 1500, credits: 55,  xp: 11, color: '#6fd3ff' },
+  soldier: { hp: 7,  speed: 1.25, size: 34, dmg: 2, fireCd: 1200, credits: 85,  xp: 17, color: '#ff9d5c' },
+  heavy:   { hp: 14, speed: 0.85, size: 36, dmg: 3, fireCd: 1100, credits: 140, xp: 28, color: '#e06666' },
+  boss:    { hp: 80, speed: 0.8, size: 48, dmg: 4, fireCd: 850,  credits: 900, xp: 220, color: '#ff4d5e' },
 };
 
 function buildRoster(tier, elite) {
   const pool = [];
-  const count = 9 + tier;
+  const count = 12 + tier * 2;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -248,7 +263,7 @@ function buildRoster(tier, elite) {
 // ---------- Доктрини (перки на один бій) ----------
 // Прибувають з постачанням раз на ~55 с. Звичайні — чистий бонус,
 // рідкісні — сила за ціну слабкості, епічні — лише в елітних боях.
-const SUPPLY_MS = 55000;
+const SUPPLY_MS = 45000;
 const PERKS = [
   // звичайні
   { id: 'cal',    rar: 'common', ico: '💥', name: 'Калібровка',       desc: '+15% урону',
@@ -332,10 +347,12 @@ function startBattle() {
     tank: st, elite, mapName: mapDef.name, mode: mapDef.mode || 'clear',
     frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0,
-    supply: 0, medkit: true, idle: 0, farmWarned: false, arcWarned: false,
+    supply: 20000, medkit: true, idle: 0, farmWarned: false, arcWarned: false,
+    gameMs: 0, dmgTaken: 0,
     perks: [],
     tierMult: 1 + 0.3 * (st.tier - 1),
   };
+  logEvent('battle_start', { tank: st.id, tier: st.tier, map: mapDef.name, mode: battle.mode, elite });
 
   player = {
     x: 0, y: 0, dir: 'up', size: st.size,
@@ -372,7 +389,7 @@ function startBattle() {
 
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
-  maxAlive = Math.min(5, 3 + Math.floor(st.tier / 3) + (elite ? 1 : 0));
+  maxAlive = Math.min(6, 3 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -437,8 +454,23 @@ function canMoveTo(tank, nx, ny) {
   return true;
 }
 
+// бос трощить цегляні стіни своєю масою
+function crushBricks(x, y, size) {
+  const h = size / 2 + 2;
+  const r1 = Math.max(0, Math.floor((y - h) / TILE)), r2 = Math.min(ROWS - 1, Math.floor((y + h) / TILE));
+  const c1 = Math.max(0, Math.floor((x - h) / TILE)), c2 = Math.min(COLS - 1, Math.floor((x + h) / TILE));
+  for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
+    if (grid[r][c] === T_BRICK) {
+      grid[r][c] = T_EMPTY;
+      spawnParticles(c * TILE + TILE / 2, r * TILE + TILE / 2, '#c9694a', 8);
+      sfx.brick();
+    }
+  }
+}
+
 function moveTank(tank, dir, dist) {
   const [dx, dy] = DIRS[dir];
+  if (tank.type === 'boss') crushBricks(tank.x + dx * (dist + 4), tank.y + dy * (dist + 4), tank.size);
   if (tank.dir !== dir) {
     if (dx !== 0) tank.y = snapIfFree(tank, tank.x, tank.y, 'y');
     else tank.x = snapIfFree(tank, tank.x, tank.y, 'x');
@@ -526,10 +558,13 @@ function trySpawnEnemy(dt) {
   if (enemies.length >= maxAlive) return;
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
-  spawnTimer = 2100;
+  spawnTimer = 1500;
   const pt = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
   const e = scaledEnemy(spawnQueue.shift(), battle.tank.tier);
-  e.x = pt.x; e.y = pt.y; e.dir = 'down';
+  // великі танки притискаємо всередину поля, щоб не застрягали біля краю
+  e.x = Math.min(W - e.size / 2 - 2, Math.max(e.size / 2 + 2, pt.x));
+  e.y = Math.min(H - e.size / 2 - 2, Math.max(e.size / 2 + 2, pt.y));
+  e.dir = 'down';
   e.cooldown = 800 + Math.random() * 800;
   e.thinkTimer = 0;
   e.spawning = 900;
@@ -668,6 +703,7 @@ function updateBullets(dt) {
       } else {
         const dmg = Math.max(1, Math.round(b.dmg - player.armor * 0.7));
         player.hp -= dmg;
+        battle.dmgTaken += dmg;
         player.invuln = 600; // коротка невразливість, щоб не вбивали залпом
         shakeTime = 180;
         sfx.hit();
@@ -711,6 +747,7 @@ function explodeBarrel(r, c) {
   if (Math.hypot(player.x - bx, player.y - by) < R && player.invuln <= 0) {
     const dmg = Math.max(1, 5 - player.armor);
     player.hp -= dmg;
+    battle.dmgTaken += dmg;
     player.invuln = 600;
     floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
     if (player.hp <= 0) { endBattle(false); return; }
@@ -745,7 +782,7 @@ function killEnemy(e) {
 
   battle.frags++;
   // анти-ферма: у штурмі після 20 фрагів нагорода за фраги вичерпана
-  const farmed = battle.mode === 'assault' && battle.frags > 20;
+  const farmed = battle.mode === 'assault' && battle.frags > 30;
   if (!farmed) {
     battle.credits += e.credits;
     battle.xp += e.xpVal;
@@ -753,7 +790,7 @@ function killEnemy(e) {
   } else {
     if (!battle.farmWarned) {
       battle.farmWarned = true;
-      floatText(player.x, player.y - 40, 'Постачання вичерпано — добий ШТАБ!', '#ff9d5c');
+      floatText(player.x, player.y - 40, 'Інтендант порожній — добий ШТАБ!', '#ff9d5c');
     }
     floatText(e.x, e.y, '+0 🪙', '#7a8aa8');
   }
@@ -782,6 +819,17 @@ function endBattle(victory) {
   if (victory) save.wins++;
   save.totalFrags += battle.frags;
   persist();
+
+  logEvent('battle_end', {
+    tank: battle.tank.id, tier: battle.tank.tier, map: battle.mapName, mode: battle.mode,
+    elite: battle.elite, victory,
+    sec: Math.round(battle.gameMs / 1000),
+    frags: battle.frags, dmg: Math.round(battle.dmgDealt), taken: Math.round(battle.dmgTaken),
+    rico: battle.ricochets, medUsed: !battle.medkit,
+    hpLeft: Math.max(0, Math.round(player.hp / player.maxHp * 100)),
+    perks: battle.perks.map(p => p.id),
+    credits: creditsEarned, xp: xpEarned,
+  });
 
   const medals = [];
   if (battle.frags >= 6) medals.push('🏅 «Мисливець» — 6+ фрагів');
@@ -854,6 +902,7 @@ function showPerkCards() {
 function pickPerk(u) {
   u.apply(player);
   battle.perks.push(u);
+  logEvent('perk', { id: u.id, rar: u.rar, offered: (window._perkPicks || []).map(p => p.id) });
   sfx.pickup();
   pendingPerks--;
   if (pendingPerks > 0) { showPerkCards(); return; }
@@ -1338,6 +1387,7 @@ function loop(now) {
 
   if (shakeTime > 0) shakeTime -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
+  battle.gameMs += dt;
 
   // постачання доктрин раз на ~55 секунд
   battle.supply += dt;
@@ -1553,6 +1603,25 @@ document.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code
 
 document.getElementById('battleBtn').onclick = startBattle;
 document.getElementById('toHangarBtn').onclick = toHangar;
+document.getElementById('logBtn').onclick = async () => {
+  const log = getLog();
+  if (!log.length) { flashMsg('Лог порожній — зіграй хоча б один бій!'); return; }
+  const text = JSON.stringify(log);
+  try {
+    await navigator.clipboard.writeText(text);
+    flashMsg(`📊 Лог скопійовано (${log.length} подій) — встав його в чат для аналізу!`);
+  } catch (e) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'steel-hangar-log.json';
+    a.click();
+    flashMsg(`📊 Лог завантажено файлом (${log.length} подій)`);
+  }
+};
+document.getElementById('logClearBtn').onclick = () => {
+  localStorage.removeItem(LOG_KEY);
+  flashMsg('Лог очищено');
+};
 document.getElementById('resetBtn').onclick = () => {
   if (confirm('Точно скинути ВЕСЬ прогрес? Усі танки й срібло зникнуть!')) {
     save = defaultSave();
