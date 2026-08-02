@@ -669,7 +669,7 @@ function startBattle(sector) {
   document.getElementById('resultOverlay').classList.add('hidden');
   document.getElementById('perkOverlay').classList.add('hidden');
   document.body.classList.add('inBattle');
-  battle.introT = 3200; // вступний банер з ціллю бою
+  battle.introT = (mapDef.mode === 'assault' || (sector && sector.mode === 'assault')) ? 5200 : 3200;
 
   state = 'play';
   lastTime = performance.now();
@@ -2178,8 +2178,9 @@ function drawHud() {
   ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd23f';
+  if (battle.mode === 'assault') ctx.fillStyle = '#ff4d5e';
   const left = battle.mode === 'assault'
-    ? `🎯 ШТАБ ${battle.hqLeft}`
+    ? `☭ ЗНИЩ ШТАБ: ${battle.hqLeft}`
     : `🎯 ${spawnQueue.length + enemies.filter(e => !e.dead).length}`;
   const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
   ctx.fillText(`⚔ ${battle.frags}   ${left}${modIco}`, 12, midY);
@@ -2188,7 +2189,7 @@ function drawHud() {
   if (battle.perks.length) {
     ctx.font = '15px monospace';
     ctx.fillStyle = '#8fa2c4';
-    ctx.fillText(battle.perks.map(p => p.ico).join(''), 175, midY);
+    ctx.fillText(battle.perks.map(p => p.ico).join('').slice(0, 12), 200, midY);
   }
 
   // центр: таймер постачання
@@ -2222,6 +2223,48 @@ function drawHud() {
   ctx.textAlign = 'center';
   ctx.fillStyle = frac > 0.35 ? '#05070c' : '#d7e0f0';
   ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, W / 2, barY + barH / 2);
+
+  // ---- ШТУРМ: постійний вказівник на штаб, щоб ціль не загубилась ----
+  if (battle.mode === 'assault' && battle.hqLeft > 0 && state === 'play') {
+    // найближчий штаб
+    let hx = null, hy = null, bd = 1e9;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (grid[r][c] !== T_HQ) continue;
+      const x = c * TILE + TILE / 2, y = r * TILE + TILE / 2;
+      const d = Math.hypot(x - player.x, y - player.y);
+      if (d < bd) { bd = d; hx = x; hy = y; }
+    }
+    if (hx !== null) {
+      const px = player.x, py = HUD_TOP + player.y;
+      const tx = hx, ty = HUD_TOP + hy;
+      const ang = Math.atan2(ty - py, tx - px);
+      const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 300);
+
+      // пульсуюче кільце навколо штабу
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,77,94,' + (0.35 + pulse * 0.45) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 26 + pulse * 8, 0, 7);
+      ctx.stroke();
+      ctx.restore();
+
+      // стрілка біля танка, якщо штаб далеко
+      if (bd > 130) {
+        ctx.save();
+        ctx.translate(px + Math.cos(ang) * 48, py + Math.sin(ang) * 48);
+        ctx.rotate(ang);
+        ctx.globalAlpha = 0.55 + pulse * 0.45;
+        ctx.fillStyle = '#ff4d5e';
+        ctx.beginPath();
+        ctx.moveTo(14, 0); ctx.lineTo(-8, -9); ctx.lineTo(-4, 0); ctx.lineTo(-8, 9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
 
   // ---- великий відлік перед постачанням (у полі) ----
   if (sec <= 5 && msLeft > 0 && state === 'play') {
@@ -2638,7 +2681,9 @@ fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = fals
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
 
 // ---------- Старт ----------
+const GAME_VERSION = 'v14 · HUD поза полем · короткі раунди';
 loadSave();
+document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
 requestAnimationFrame(loop);
 
