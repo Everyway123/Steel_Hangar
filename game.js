@@ -384,7 +384,7 @@ function buildRoster(tier, elite) {
 // Прибувають з постачанням раз на ~55 с. Звичайні — чистий бонус,
 // рідкісні — сила за ціну слабкості, епічні — лише в елітних боях.
 const SUPPLY_MS = 45000;
-const BATTLE_LIMIT_MS = 180000; // 3 хвилини — жорстка межа раунду
+const BATTLE_LIMIT_MS = 120000; // 2 хвилини — жорстка межа раунду
 const PERKS = [
   // польові — прості, але відчутні
   { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+60% срібла за кожен фраг до кінця бою',
@@ -2232,6 +2232,38 @@ function drawHud() {
   ctx.fillStyle = frac > 0.35 ? '#05070c' : '#d7e0f0';
   ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, W / 2, barY + barH / 2);
 
+  // ---- ЗАЧИСТКА: коли лишилось ≤3 вороги — вказівники, щоб не шукати їх по карті ----
+  if (battle.mode === 'clear' && state === 'play') {
+    const alive = enemies.filter(e => !e.dead && !(e.spawning > 0));
+    if (alive.length && alive.length + spawnQueue.length <= 3) {
+      const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 300);
+      for (const e of alive) {
+        const ex = e.x, ey = HUD_TOP + e.y;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,210,63,' + (0.3 + pulse * 0.4) + ')';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 24 + pulse * 6, 0, 7);
+        ctx.stroke();
+        ctx.restore();
+        const d = Math.hypot(e.x - player.x, e.y - player.y);
+        if (d > 150) {
+          const ang = Math.atan2(ey - (HUD_TOP + player.y), ex - player.x);
+          ctx.save();
+          ctx.translate(player.x + Math.cos(ang) * 46, HUD_TOP + player.y + Math.sin(ang) * 46);
+          ctx.rotate(ang);
+          ctx.globalAlpha = 0.5 + pulse * 0.4;
+          ctx.fillStyle = '#ffd23f';
+          ctx.beginPath();
+          ctx.moveTo(12, 0); ctx.lineTo(-7, -8); ctx.lineTo(-3, 0); ctx.lineTo(-7, 8);
+          ctx.closePath(); ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+  }
+
   // ---- ШТУРМ: постійний вказівник на штаб, щоб ціль не загубилась ----
   if (battle.mode === 'assault' && battle.hqLeft > 0 && state === 'play') {
     // найближчий штаб
@@ -2698,7 +2730,7 @@ fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = fals
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v15 · таймер бою 3 хв · компас на штаб';
+const GAME_VERSION = 'v16 · бій max 2 хв · вказівники на ціль';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
