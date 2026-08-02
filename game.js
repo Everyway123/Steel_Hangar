@@ -384,6 +384,7 @@ function buildRoster(tier, elite) {
 // Прибувають з постачанням раз на ~55 с. Звичайні — чистий бонус,
 // рідкісні — сила за ціну слабкості, епічні — лише в елітних боях.
 const SUPPLY_MS = 45000;
+const BATTLE_LIMIT_MS = 180000; // 3 хвилини — жорстка межа раунду
 const PERKS = [
   // польові — прості, але відчутні
   { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+60% срібла за кожен фраг до кінця бою',
@@ -593,7 +594,7 @@ function startBattle(sector) {
     mines: [], strikes: [], artT: 3000,
     frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0,
-    supply: 20000, medkit: true, idle: 0, farmWarned: false, arcWarned: false,
+    supply: 20000, medkit: true, idle: 0, farmWarned: false, arcWarned: false, reinforce: 14,
     gameMs: 0, dmgTaken: 0,
     perks: [],
     tierMult: 1 + 0.3 * (st.tier - 1),
@@ -832,8 +833,9 @@ function bossSpreadShot(boss) {
 
 // ---------- Спавн і AI ----------
 function trySpawnEnemy(dt) {
-  // у штурмі підкріплення не закінчуються
-  if (battle.mode === 'assault' && !spawnQueue.length) {
+  // у штурмі є підкріплення, але вони скінченні (щоб бій не тягнувся вічно)
+  if (battle.mode === 'assault' && !spawnQueue.length && battle.reinforce > 0) {
+    battle.reinforce--;
     const tier = battle.tank.tier;
     const r = Math.random();
     spawnQueue.push(tier <= 2 ? (r < 0.6 ? 'scout' : 'soldier')
@@ -1259,7 +1261,8 @@ function endBattle(victory) {
   if (victory && player.hp / player.maxHp > 0.6) medals.push('⚔ «Домінатор» — перемога з запасом HP');
   if (battle.bossKilled) medals.push('💀 «Генераловбивця» — знищено боса!');
 
-  document.getElementById('resultTitle').textContent = victory ? '🏆 ПЕРЕМОГА!' : '💥 ТАНК ЗНИЩЕНО';
+  document.getElementById('resultTitle').textContent = victory ? '🏆 ПЕРЕМОГА!'
+    : battle.timeUp ? '⏱ ЧАС ВИЙШОВ' : '💥 ТАНК ЗНИЩЕНО';
   document.getElementById('resultTitle').style.color = victory ? '#ffd23f' : '#ff4d5e';
   document.getElementById('resultTable').innerHTML = `
     <tr><td>Карта</td><td>${battle.mapName}${battle.elite ? ' ☠ (елітний ×2)' : ''}</td></tr>
@@ -2192,13 +2195,18 @@ function drawHud() {
     ctx.fillText(battle.perks.map(p => p.ico).join('').slice(0, 12), 200, midY);
   }
 
-  // центр: таймер постачання
+  // центр: час до кінця бою + таймер постачання
   const msLeft = Math.max(0, SUPPLY_MS - battle.supply);
   const sec = Math.ceil(msLeft / 1000);
-  ctx.font = 'bold 15px monospace';
+  const leftMs = Math.max(0, BATTLE_LIMIT_MS - battle.gameMs);
+  const mm = Math.floor(leftMs / 60000), ss = Math.floor((leftMs % 60000) / 1000);
+  ctx.font = 'bold 16px monospace';
   ctx.textAlign = 'center';
+  ctx.fillStyle = leftMs < 30000 ? '#ff4d5e' : '#d7e0f0';
+  ctx.fillText(`⏱ ${mm}:${String(ss).padStart(2, '0')}`, W / 2 - 42, midY);
+  ctx.font = 'bold 14px monospace';
   ctx.fillStyle = sec <= 5 ? '#39ff88' : '#8fa2c4';
-  ctx.fillText(`📦 ${sec}с`, W / 2, midY);
+  ctx.fillText(`📦 ${sec}с`, W / 2 + 52, midY);
 
   // праворуч: аптечка
   ctx.textAlign = 'right';
@@ -2319,6 +2327,15 @@ function loop(now) {
   if (battle.enemyShotCd > 0) battle.enemyShotCd -= dt;
   battle.gameMs += dt;
   if (battle.introT > 0) battle.introT -= dt;
+
+  // жорстка межа раунду: час вийшов — бій завершується підсумком
+  if (battle.gameMs >= BATTLE_LIMIT_MS) {
+    // у штурмі це поразка (штаб не взято), у зачистці — рахуємо за фрагами
+    const won = battle.mode === 'clear' && spawnQueue.length === 0 && enemies.every(e => e.dead);
+    battle.timeUp = true;
+    endBattle(won);
+    return;
+  }
 
   // постачання доктрин раз на ~45 секунд, з відліком-попередженням
   battle.supply += dt;
@@ -2681,7 +2698,7 @@ fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = fals
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v14 · HUD поза полем · короткі раунди';
+const GAME_VERSION = 'v15 · таймер бою 3 хв · компас на штаб';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
