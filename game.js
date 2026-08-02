@@ -369,7 +369,7 @@ const ENEMY_TYPES = {
 
 function buildRoster(tier, elite) {
   const pool = [];
-  const count = 12 + tier * 2;
+  const count = 7 + tier;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -424,6 +424,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const TILE = 40, COLS = 16, ROWS = 14;
 const W = COLS * TILE, H = ROWS * TILE;
+const HUD_TOP = 42, HUD_BOT = 46; // смуги HUD поза ігровим полем
 const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7, T_HEDGE = 8, T_FENCE = 9, T_ICE = 10, T_TURRET = 11;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
@@ -657,7 +658,7 @@ function startBattle(sector) {
 
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
-  maxAlive = Math.min(5, 3 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
+  maxAlive = Math.min(6, 4 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -678,7 +679,7 @@ function startBattle(sector) {
 function scaledEnemy(typeName, tier) {
   const t = ENEMY_TYPES[typeName];
   const fl = (save.front && save.front.level || 1) - 1; // рівень фронту робить всіх злішими
-  const hpMult = (1 + 0.25 * (tier - 1)) * (1 + 0.3 * fl);
+  const hpMult = (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl);
   const dmgAdd = (tier <= 2 ? -1 : 0) + Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
@@ -842,7 +843,7 @@ function trySpawnEnemy(dt) {
   if (enemies.length >= maxAlive) return;
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
-  spawnTimer = 1800;
+  spawnTimer = 1000;
   const pt = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
   const e = scaledEnemy(spawnQueue.shift(), battle.tank.tier);
   // великі танки притискаємо всередину поля, щоб не застрягали біля краю
@@ -2009,7 +2010,12 @@ function drawTank(t, color, isPlayer) {
 }
 
 function draw() {
+  // фон усього полотна (включно зі смугами HUD)
+  ctx.fillStyle = '#080c14';
+  ctx.fillRect(0, 0, W, H + HUD_TOP + HUD_BOT);
+
   ctx.save();
+  ctx.translate(0, HUD_TOP); // ігрове поле нижче верхньої панелі
   if (shakeTime > 0) ctx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
   ctx.fillStyle = '#05070c';
   ctx.fillRect(-10, -10, W + 20, H + 20);
@@ -2157,92 +2163,102 @@ function draw() {
 // HUD малюється прямо на полі бою — все в одному екрані
 function drawHud() {
   if (!battle) return;
+  const BOT_Y = HUD_TOP + H; // початок нижньої смуги
   ctx.save();
   ctx.textBaseline = 'middle';
 
-  // верхня панель
-  ctx.fillStyle = 'rgba(5,7,12,.8)';
-  ctx.fillRect(0, 0, W, 36);
+  // ---- верхня панель (над полем) ----
+  ctx.fillStyle = '#101725';
+  ctx.fillRect(0, 0, W, HUD_TOP);
+  ctx.strokeStyle = '#263149';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, HUD_TOP - 0.5); ctx.lineTo(W, HUD_TOP - 0.5); ctx.stroke();
+
+  const midY = HUD_TOP / 2;
   ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd23f';
   const left = battle.mode === 'assault'
-    ? `🎯 ШТАБ: ${battle.hqLeft}`
+    ? `🎯 ШТАБ ${battle.hqLeft}`
     : `🎯 ${spawnQueue.length + enemies.filter(e => !e.dead).length}`;
   const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
-  ctx.fillText(`⚔ ${battle.frags}   ${left}${modIco}`, 12, 19);
+  ctx.fillText(`⚔ ${battle.frags}   ${left}${modIco}`, 12, midY);
+
+  // взяті доктрини — праворуч від лічильників
+  if (battle.perks.length) {
+    ctx.font = '15px monospace';
+    ctx.fillStyle = '#8fa2c4';
+    ctx.fillText(battle.perks.map(p => p.ico).join(''), 175, midY);
+  }
 
   // центр: таймер постачання
   const msLeft = Math.max(0, SUPPLY_MS - battle.supply);
   const sec = Math.ceil(msLeft / 1000);
+  ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'center';
   ctx.fillStyle = sec <= 5 ? '#39ff88' : '#8fa2c4';
-  ctx.fillText(`📦 доктрина за ${sec}с`, W / 2, 19);
+  ctx.fillText(`📦 ${sec}с`, W / 2, midY);
 
   // праворуч: аптечка
   ctx.textAlign = 'right';
   ctx.fillStyle = battle.medkit ? '#39ff88' : '#3a4661';
-  ctx.fillText(battle.medkit ? '🔧 аптечка [E]' : '🔧 —', W - 12, 19);
+  ctx.fillText(battle.medkit ? '🔧 аптечка [E]' : '🔧 —', W - 12, midY);
 
-  // взяті доктрини — іконки під панеллю
-  if (battle.perks.length) {
-    ctx.textAlign = 'left';
-    ctx.font = '17px monospace';
-    ctx.fillStyle = '#ffd23f';
-    ctx.fillText(battle.perks.map(p => p.ico).join(' '), 12, 52);
-  }
-
-  // нижня панель: HP
-  ctx.fillStyle = 'rgba(5,7,12,.8)';
-  ctx.fillRect(0, H - 28, W, 28);
-  const frac = Math.max(0, player.hp / player.maxHp);
-  ctx.fillStyle = '#05070c';
-  ctx.fillRect(10, H - 20, W - 20, 12);
-  ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
-  ctx.fillRect(10, H - 20, (W - 20) * frac, 12);
+  // ---- нижня панель: HP (під полем) ----
+  ctx.fillStyle = '#101725';
+  ctx.fillRect(0, BOT_Y, W, HUD_BOT);
   ctx.strokeStyle = '#263149';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(10, H - 20, W - 20, 12);
-  ctx.font = 'bold 11px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#05070c';
-  ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, W / 2, H - 14);
+  ctx.beginPath(); ctx.moveTo(0, BOT_Y + 0.5); ctx.lineTo(W, BOT_Y + 0.5); ctx.stroke();
 
-  // великий відлік перед постачанням
+  const frac = Math.max(0, player.hp / player.maxHp);
+  const barY = BOT_Y + 13, barH = 18;
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(12, barY, W - 24, barH);
+  ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
+  ctx.fillRect(12, barY, (W - 24) * frac, barH);
+  ctx.strokeStyle = '#263149';
+  ctx.strokeRect(12, barY, W - 24, barH);
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = frac > 0.35 ? '#05070c' : '#d7e0f0';
+  ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, W / 2, barY + barH / 2);
+
+  // ---- великий відлік перед постачанням (у полі) ----
   if (sec <= 5 && msLeft > 0 && state === 'play') {
     const pulse = 1 - (msLeft % 1000) / 1000;
-    ctx.font = `bold ${Math.round(38 + pulse * 14)}px monospace`;
+    ctx.font = `bold ${Math.round(36 + pulse * 12)}px monospace`;
     ctx.textAlign = 'center';
     ctx.globalAlpha = 0.5 + pulse * 0.5;
     ctx.fillStyle = '#ffd23f';
     ctx.shadowColor = '#ffd23f';
     ctx.shadowBlur = 18;
-    ctx.fillText(`📦 ${sec}`, W / 2, 100);
+    ctx.fillText(`📦 ${sec}`, W / 2, HUD_TOP + 90);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
 
-  // вступний банер з ціллю
+  // ---- вступний банер ----
   if (battle.introT > 0) {
     const a = Math.min(1, battle.introT / 700);
+    const cy = HUD_TOP + H / 2;
     ctx.globalAlpha = a;
-    ctx.fillStyle = 'rgba(5,7,12,.75)';
-    ctx.fillRect(0, H / 2 - 58, W, 116);
+    ctx.fillStyle = 'rgba(5,7,12,.78)';
+    ctx.fillRect(0, cy - 58, W, 116);
     ctx.textAlign = 'center';
     ctx.fillStyle = battle.mode === 'assault' ? '#ff4d5e' : '#39ff88';
     ctx.font = 'bold 26px monospace';
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 16;
-    ctx.fillText(battle.mode === 'assault' ? '☭ ЗНИЩ ВОРОЖИЙ ШТАБ!' : '⚔ ЗНИЩ УСІ ТАНКИ!', W / 2, H / 2 - 16);
+    ctx.fillText(battle.mode === 'assault' ? '☭ ЗНИЩ ВОРОЖИЙ ШТАБ!' : '⚔ ЗНИЩ УСІ ТАНКИ!', W / 2, cy - 16);
     ctx.shadowBlur = 0;
     ctx.font = '15px monospace';
     ctx.fillStyle = '#d7e0f0';
-    ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ ×2' : ''), W / 2, H / 2 + 16);
+    ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ' : ''), W / 2, cy + 16);
     ctx.fillStyle = '#8fa2c4';
     ctx.font = '13px monospace';
     let sub = battle.mode === 'assault' ? 'Вороги нескінченні — прорвися і знеси штаб' : '';
-    if (battle.mod) sub = (sub ? sub + '  ·  ' : '') + MOD_INFO[battle.mod].ico + ' ' + MOD_INFO[battle.mod].name + ': ' + MOD_INFO[battle.mod].desc;
-    if (sub) ctx.fillText(sub, W / 2, H / 2 + 40);
+    if (battle.mod) sub = (sub ? sub + '  ·  ' : '') + MOD_INFO[battle.mod].ico + ' ' + MOD_INFO[battle.mod].name;
+    if (sub) ctx.fillText(sub, W / 2, cy + 40);
     ctx.globalAlpha = 1;
   }
   ctx.restore();
