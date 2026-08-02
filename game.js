@@ -426,7 +426,7 @@ const ctx = canvas.getContext('2d');
 const TILE = 40, COLS = 16, ROWS = 14;
 const W = COLS * TILE, H = ROWS * TILE;
 const HUD_TOP = 42, HUD_BOT = 46; // смуги HUD поза ігровим полем
-const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7, T_HEDGE = 8, T_FENCE = 9, T_ICE = 10, T_TURRET = 11;
+const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7, T_HEDGE = 8, T_FENCE = 9, T_ICE = 10, T_TURRET = 11, T_HOME = 12;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 let grid, gridHp, player, enemies, bullets, particles, drops;
@@ -637,6 +637,33 @@ function startBattle(sector) {
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
       if (grid[r][c] === T_HQ) battle.hqLeft++;
+
+  // ---- БАЗИ: на кожній карті є твоя ★ (захищай) і ворожа ☭ (руйнуй) ----
+  const putBase = (r, c, tile, hp) => {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+    grid[r][c] = tile; gridHp[r][c] = hp;
+    // захисний мур із цегли навколо
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if ((dr === 0 && dc === 0) || rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+      if (grid[rr][cc] === T_EMPTY || grid[rr][cc] === T_SAND || grid[rr][cc] === T_ICE) {
+        grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 3;
+      }
+    }
+  };
+
+  const baseHp = 12 + 4 * st.tier;
+  // ворожа база — вгорі по центру (якщо карта не має власних штабів)
+  if (battle.hqLeft === 0) {
+    putBase(1, Math.floor(COLS / 2) - 1, T_HQ, baseHp);
+    battle.hqLeft = 1;
+  }
+  // твоя база — під спавном гравця
+  const pr = Math.min(ROWS - 1, Math.floor(player.y / TILE) + 1);
+  const pc = Math.floor(player.x / TILE);
+  putBase(pr, pc, T_HOME, baseHp);
+  battle.homeHp = baseHp; battle.homeMax = baseHp;
+  battle.homeR = pr; battle.homeC = pc;
 
   // ДОТи: збираємо список турелей
   battle.turrets = [];
@@ -865,8 +892,12 @@ function updateEnemy(e, dt) {
   e.thinkTimer -= dt;
   if (e.thinkTimer <= 0) {
     e.thinkTimer = 400 + Math.random() * 1200;
-    const ddx = player.x - e.x, ddy = player.y - e.y;
-    const chase = Math.hypot(ddx, ddy) < 300 ? 0.88 : 0.72; // поблизу — липнуть до тебе
+    // половина ворогів суне до ТВОЄЇ БАЗИ — не можна просто відсидітись
+    const homeX = battle.homeC * TILE + TILE / 2, homeY = battle.homeR * TILE + TILE / 2;
+    const goHome = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME && Math.random() < 0.45;
+    const tx = goHome ? homeX : player.x, ty = goHome ? homeY : player.y;
+    const ddx = tx - e.x, ddy = ty - e.y;
+    const chase = Math.hypot(ddx, ddy) < 300 ? 0.88 : 0.72;
     if (Math.random() < chase) {
       e.wantDir = Math.abs(ddx) > Math.abs(ddy)
         ? (ddx > 0 ? 'right' : 'left')
@@ -914,6 +945,25 @@ function updateEnemy(e, dt) {
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
       e.cooldown = e.fireCd + Math.random() * 400;
       battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+    } else if (canFire && grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME &&
+               (() => {
+                 const hx = battle.homeC * TILE + TILE / 2, hy = battle.homeR * TILE + TILE / 2;
+                 const hd = Math.hypot(hx - e.x, hy - e.y);
+                 if (hd > 200 || !hasLOS(e.x, e.y, hx, hy)) return false;
+                 const a = Math.atan2(hy - e.y, hx - e.x);
+                 const df = Math.abs(((a - facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+                 if (df > 0.6) { // довертається до бази
+                   e.wantDir = Math.abs(hx - e.x) > Math.abs(hy - e.y) ? (hx > e.x ? 'right' : 'left') : (hy > e.y ? 'down' : 'up');
+                   e.dir = e.wantDir; e.thinkTimer = 400; e.cooldown = 500;
+                   return false;
+                 }
+                 e.turretAngle = a;
+                 fireBullet(e, a, 3.6, e.dmg, false);
+                 e.cooldown = e.fireCd + Math.random() * 300;
+                 battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+                 return true;
+               })()) {
+      // постріл по базі гравця вже зроблено
     } else if (los && dist < 300) {
       // бачить зблизька — розвертається, але потребує часу на прицілювання
       const ddx = player.x - e.x, ddy = player.y - e.y;
@@ -997,6 +1047,19 @@ function updateBullets(dt) {
     if (t === T_BARREL) {
       b.dead = true;
       explodeBarrel(r, c);
+      continue;
+    }
+    if (t === T_HOME) {
+      b.dead = true;
+      if (!b.fromPlayer) {
+        gridHp[r][c] -= b.dmg;
+        battle.homeHp = gridHp[r][c];
+        sfx.hit();
+        shakeTime = 200;
+        spawnParticles(b.x, b.y, '#39ff88', 8);
+        floatText(b.x, b.y - 20, '★ БАЗА!', '#ff4d5e');
+        if (gridHp[r][c] <= 0) { destroyHome(r, c); return; }
+      }
       continue;
     }
     if (t === T_HQ) {
@@ -1160,6 +1223,16 @@ function updateTurrets(dt) {
   }
 }
 
+function destroyHome(r, c) {
+  grid[r][c] = T_EMPTY;
+  const bx = c * TILE + TILE / 2, by = r * TILE + TILE / 2;
+  sfx.boom();
+  shakeTime = 600;
+  spawnParticles(bx, by, '#39ff88', 45);
+  battle.homeLost = true;
+  endBattle(false);
+}
+
 function destroyHQ(r, c) {
   grid[r][c] = T_EMPTY;
   const bx = c * TILE + TILE / 2, by = r * TILE + TILE / 2;
@@ -1168,7 +1241,7 @@ function destroyHQ(r, c) {
   spawnParticles(bx, by, '#ff4d5e', 40);
   battle.hqLeft--;
   battle.credits += 400;
-  floatText(bx, by, 'ШТАБ ЗНИЩЕНО! +400 🪙', '#ffd23f');
+  floatText(bx, by, '☭ ВОРОЖА БАЗА ЗНИЩЕНА! +400 🪙', '#ffd23f');
   if (battle.hqLeft <= 0) endBattle(true);
 }
 
@@ -1262,7 +1335,7 @@ function endBattle(victory) {
   if (battle.bossKilled) medals.push('💀 «Генераловбивця» — знищено боса!');
 
   document.getElementById('resultTitle').textContent = victory ? '🏆 ПЕРЕМОГА!'
-    : battle.timeUp ? '⏱ ЧАС ВИЙШОВ' : '💥 ТАНК ЗНИЩЕНО';
+    : battle.homeLost ? '★ БАЗУ ВТРАЧЕНО' : battle.timeUp ? '⏱ ЧАС ВИЙШОВ' : '💥 ТАНК ЗНИЩЕНО';
   document.getElementById('resultTitle').style.color = victory ? '#ffd23f' : '#ff4d5e';
   document.getElementById('resultTable').innerHTML = `
     <tr><td>Карта</td><td>${battle.mapName}${battle.elite ? ' ☠ (елітний ×2)' : ''}</td></tr>
@@ -1746,6 +1819,28 @@ function drawTile(r, c) {
     ctx.fillRect(x + 2, y - 7, TILE - 4, 5);
     ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
     ctx.fillRect(x + 2, y - 7, (TILE - 4) * frac, 5);
+  } else if (t === T_HOME) {
+    // ТВОЯ БАЗА — захищай!
+    ctx.fillStyle = '#12281c';
+    ctx.fillRect(x, y, TILE, TILE);
+    ctx.strokeStyle = '#39ff88';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 3, y + 3, TILE - 6, TILE - 6);
+    const pl = 0.7 + Math.sin(performance.now() / 350) * 0.3;
+    ctx.save();
+    ctx.shadowColor = '#39ff88';
+    ctx.shadowBlur = 14 * pl;
+    ctx.fillStyle = '#39ff88';
+    ctx.font = '24px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('★', x + TILE / 2, y + TILE / 2 + 1);
+    ctx.restore();
+    const hf = Math.max(0, gridHp[r][c] / (battle.homeMax || 1));
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(x + 2, y - 7, TILE - 4, 5);
+    ctx.fillStyle = hf > 0.5 ? '#39ff88' : hf > 0.25 ? '#ffd23f' : '#ff4d5e';
+    ctx.fillRect(x + 2, y - 7, (TILE - 4) * hf, 5);
   } else if (t === T_HQ) {
     ctx.fillStyle = '#2a1a22';
     ctx.fillRect(x, y, TILE, TILE);
@@ -1763,7 +1858,7 @@ function drawTile(r, c) {
     ctx.fillText('☭', x + TILE / 2, y + TILE / 2 + 1);
     ctx.restore();
     // смужка міцності штабу
-    const maxHp = 14 + 5 * battle.tank.tier;
+    const maxHp = battle.homeMax || (12 + 4 * battle.tank.tier);
     const frac = Math.max(0, gridHp[r][c] / maxHp);
     ctx.fillStyle = '#05070c';
     ctx.fillRect(x + 2, y - 7, TILE - 4, 5);
@@ -2181,10 +2276,10 @@ function drawHud() {
   ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd23f';
-  if (battle.mode === 'assault') ctx.fillStyle = '#ff4d5e';
-  const left = battle.mode === 'assault'
-    ? `☭ ЗНИЩ ШТАБ: ${battle.hqLeft}`
-    : `🎯 ${spawnQueue.length + enemies.filter(e => !e.dead).length}`;
+  const homeAlive = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME;
+  const homeFrac = homeAlive ? Math.max(0, gridHp[battle.homeR][battle.homeC] / battle.homeMax) : 0;
+  ctx.fillStyle = homeFrac < 0.4 ? '#ff4d5e' : '#39ff88';
+  const left = `★ ${Math.round(homeFrac * 100)}%   ☭ ${battle.hqLeft}`;
   const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
   ctx.fillText(`⚔ ${battle.frags}   ${left}${modIco}`, 12, midY);
 
@@ -2265,7 +2360,7 @@ function drawHud() {
   }
 
   // ---- ШТУРМ: постійний вказівник на штаб, щоб ціль не загубилась ----
-  if (battle.mode === 'assault' && battle.hqLeft > 0 && state === 'play') {
+  if (battle.hqLeft > 0 && state === 'play') {
     // найближчий штаб
     let hx = null, hy = null, bd = 1e9;
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
@@ -2328,11 +2423,11 @@ function drawHud() {
     ctx.fillStyle = 'rgba(5,7,12,.78)';
     ctx.fillRect(0, cy - 58, W, 116);
     ctx.textAlign = 'center';
-    ctx.fillStyle = battle.mode === 'assault' ? '#ff4d5e' : '#39ff88';
-    ctx.font = 'bold 26px monospace';
+    ctx.fillStyle = '#ffd23f';
+    ctx.font = 'bold 21px monospace';
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 16;
-    ctx.fillText(battle.mode === 'assault' ? '☭ ЗНИЩ ВОРОЖИЙ ШТАБ!' : '⚔ ЗНИЩ УСІ ТАНКИ!', W / 2, cy - 16);
+    ctx.fillText('☭ ЗНИЩ ВОРОЖУ БАЗУ — ЗАХИСТИ СВОЮ ★', W / 2, cy - 16);
     ctx.shadowBlur = 0;
     ctx.font = '15px monospace';
     ctx.fillStyle = '#d7e0f0';
@@ -2730,7 +2825,7 @@ fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = fals
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v16 · бій max 2 хв · вказівники на ціль';
+const GAME_VERSION = 'v17 · дві бази: атакуй ☭ і захищай ★';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
