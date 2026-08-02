@@ -375,6 +375,7 @@ function buildRoster(tier, elite) {
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
     else if (tier === 3) pool.push(r < 0.3 ? 'scout' : r < 0.72 ? 'soldier' : r < 0.88 ? 'heavy' : 'rocket');
     else pool.push(r < 0.18 ? 'scout' : r < 0.5 ? 'soldier' : r < 0.85 ? 'heavy' : 'rocket');
+    // (склад хвиль важчає через scaledEnemy: більше HP і швидкості)
   }
   if (elite) pool.push('boss');
   return pool;
@@ -383,7 +384,10 @@ function buildRoster(tier, elite) {
 // ---------- Доктрини (перки на один бій) ----------
 // Прибувають з постачанням раз на ~55 с. Звичайні — чистий бонус,
 // рідкісні — сила за ціну слабкості, епічні — лише в елітних боях.
-const SUPPLY_MS = 45000;
+const SUPPLY_MS = 45000;              // (лишається як страховка від нульового прогресу)
+const SUPPLY_COST = 100;              // бойових очок на одне постачання
+// очки за дії: фраг, урон, шкода ворожій базі — сила заробляється боєм
+const PTS = { frag: 12, dmg: 1, hqDmg: 3, base: 25 };
 const BATTLE_LIMIT_MS = 120000; // 2 хвилини — жорстка межа раунду
 const PERKS = [
   // польові — прості, але відчутні
@@ -501,15 +505,16 @@ const music = {
   started: false, step: 0, next: 0, timer: null, delay: null,
 };
 const NOTE = n => 55 * Math.pow(2, n / 12); // від A1
-// Am — F — C — G, корені у півтонах від A
+// Dm — Bb — F — C: важчий, «броньований» настрій замість неонового
 const CHORDS = [
-  { root: 0,  tones: [0, 3, 7, 12] },
+  { root: 5,  tones: [0, 3, 7, 10] },
+  { root: 1,  tones: [0, 4, 7, 11] },
   { root: 8,  tones: [0, 4, 7, 12] },
-  { root: 3,  tones: [0, 4, 7, 12] },
-  { root: 10, tones: [0, 4, 7, 12] },
+  { root: 3,  tones: [0, 4, 7, 10] },
 ];
-const BASS_PAT = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0];
-const ARP_PAT  = [0, null, 1, null, 2, null, null, 3, null, 2, null, 1, null, null, 2, null];
+// бас марширує рівно — крок гусениць
+const BASS_PAT = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1];
+const ARP_PAT  = [0, null, null, 2, null, 1, null, null, 3, null, null, 2, null, 1, null, null];
 
 function startMusic() {
   if (music.started || !music.on) return;
@@ -528,7 +533,7 @@ function startMusic() {
 }
 function musicSchedule() {
   if (!music.on || !audioCtx) return;
-  const stepDur = 60 / 92 / 4; // 92 BPM, 16-ті
+  const stepDur = 60 / 104 / 4; // 104 BPM — трохи бадьоріше, маршовий крок
   while (music.next < audioCtx.currentTime + 0.25) {
     musicStep(music.step, music.next, stepDur);
     music.step = (music.step + 1) % 64;
@@ -547,16 +552,19 @@ function musicNote(freq, t, dur, type, vol, dest) {
 function musicStep(i, t, stepDur) {
   const chord = CHORDS[Math.floor(i / 16) % 4];
   const s16 = i % 16;
-  // бас — м'який трикутний пульс
-  if (BASS_PAT[s16]) musicNote(NOTE(chord.root), t, stepDur * 2.6, 'triangle', 0.05);
-  // арпеджіо — рідке, з відлунням
+  // бас — короткий важкий пульс (крок гусениці)
+  if (BASS_PAT[s16]) musicNote(NOTE(chord.root), t, stepDur * 1.3, 'square', 0.045);
+  // підбас октавою нижче на сильну долю
+  if (s16 % 8 === 0) musicNote(NOTE(chord.root) / 2, t, stepDur * 3, 'triangle', 0.05);
+  // мелодія — рідка, з відлунням
   const arp = ARP_PAT[s16];
   if (arp !== null) {
     const oct = Math.floor(i / 32) % 2 ? 36 : 24;
-    musicNote(NOTE(chord.root + chord.tones[arp] + oct), t, stepDur * 1.8, 'sine', 0.035, music.delay);
+    musicNote(NOTE(chord.root + chord.tones[arp] + oct), t, stepDur * 2.2, 'triangle', 0.03, music.delay);
   }
-  // легкий «хет» на слабку долю
-  if (s16 % 4 === 2) noiseBurstAt(t, 0.03, 'highpass', 6000, 0.012);
+  // «малий барабан» на 2 і 4 долю — маршовий каркас
+  if (s16 === 4 || s16 === 12) noiseBurstAt(t, 0.07, 'bandpass', 1900, 0.035);
+  if (s16 % 4 === 2) noiseBurstAt(t, 0.025, 'highpass', 7000, 0.01);
 }
 function noiseBurstAt(t, dur, type, freq, vol) {
   const src = audioCtx.createBufferSource();
@@ -594,7 +602,7 @@ function startBattle(sector) {
     mines: [], strikes: [], artT: 3000,
     frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0,
-    supply: 20000, medkit: true, idle: 0, farmWarned: false, arcWarned: false, reinforce: 14,
+    supply: 0, pts: 0, ptsTotal: 0, wave: 1, waveT: 0, medkit: true, idle: 0, farmWarned: false, arcWarned: false, reinforce: 14,
     gameMs: 0, dmgTaken: 0,
     perks: [],
     tierMult: 1 + 0.3 * (st.tier - 1),
@@ -639,15 +647,29 @@ function startBattle(sector) {
       if (grid[r][c] === T_HQ) battle.hqLeft++;
 
   // ---- БАЗИ: на кожній карті є твоя ★ (захищай) і ворожа ☭ (руйнуй) ----
-  const putBase = (r, c, tile, hp) => {
+  // мур П-подібний: бік, звернений до поля, лишається відкритим,
+  // інакше і вороги, і ящики замуровуються наглухо
+  const putBase = (r, c, tile, hp, openSide) => {
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
     grid[r][c] = tile; gridHp[r][c] = hp;
-    // захисний мур із цегли навколо
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
       const rr = r + dr, cc = c + dc;
       if ((dr === 0 && dc === 0) || rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+      if (openSide === 'down' && dr === 1) continue;   // прохід знизу
+      if (openSide === 'up' && dr === -1) continue;    // прохід згори
       if (grid[rr][cc] === T_EMPTY || grid[rr][cc] === T_SAND || grid[rr][cc] === T_ICE) {
         grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 3;
+      }
+    }
+  };
+  // прибираємо стіни, що могли б замурувати точки спавну ворогів
+  const clearSpawns = () => {
+    for (const p of spawnPoints) {
+      const r = Math.floor(p.y / TILE), c = Math.floor(p.x / TILE);
+      for (const [dr, dc] of [[0,0],[1,0],[0,1],[0,-1]]) {
+        const rr = r + dr, cc = c + dc;
+        if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+        if (grid[rr][cc] === T_BRICK) grid[rr][cc] = T_EMPTY;
       }
     }
   };
@@ -655,13 +677,14 @@ function startBattle(sector) {
   const baseHp = 12 + 4 * st.tier;
   // ворожа база — вгорі по центру (якщо карта не має власних штабів)
   if (battle.hqLeft === 0) {
-    putBase(1, Math.floor(COLS / 2) - 1, T_HQ, baseHp);
+    putBase(1, Math.floor(COLS / 2) - 1, T_HQ, baseHp, 'down'); // підхід знизу відкритий
     battle.hqLeft = 1;
   }
   // твоя база — під спавном гравця
   const pr = Math.min(ROWS - 1, Math.floor(player.y / TILE) + 1);
   const pc = Math.floor(player.x / TILE);
-  putBase(pr, pc, T_HOME, baseHp);
+  putBase(pr, pc, T_HOME, baseHp, 'up'); // гравець заїжджає згори
+  clearSpawns();
   battle.homeHp = baseHp; battle.homeMax = baseHp;
   battle.homeR = pr; battle.homeC = pc;
 
@@ -707,12 +730,13 @@ function startBattle(sector) {
 function scaledEnemy(typeName, tier) {
   const t = ENEMY_TYPES[typeName];
   const fl = (save.front && save.front.level || 1) - 1; // рівень фронту робить всіх злішими
-  const hpMult = (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl);
+  const wv = Math.max(0, (battle.wave || 1) - 1);       // кожна хвиля — сильніші вороги
+  const hpMult = (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv);
   const dmgAdd = (tier <= 2 ? -1 : 0) + Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
     hp: Math.round(t.hp * hpMult), maxHp: Math.round(t.hp * hpMult),
-    speed: t.speed, size: t.size,
+    speed: t.speed * (1 + 0.06 * wv), size: t.size,
     dmg: Math.max(1, t.dmg + dmgAdd), fireCd: t.fireCd,
     credits: t.credits, xpVal: t.xp, color: t.color,
   };
@@ -909,8 +933,21 @@ function updateEnemy(e, dt) {
   if (e.flash > 0) e.flash -= dt;
   if (e.slowT > 0) e.slowT -= dt;
   const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.7 : tileAt(e.x, e.y) === T_ICE ? 1.25 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
-  if (!moveTank(e, e.wantDir || 'down', eSpeed)) e.thinkTimer = 0;
-  else e.tread = (e.tread || 0) + eSpeed;
+  if (!moveTank(e, e.wantDir || 'down', eSpeed)) {
+    e.thinkTimer = 0;
+    // застряг надовго — прориває цеглу навколо себе, щоб не стояти вічно
+    e.stuck = (e.stuck || 0) + dt;
+    if (e.stuck > 2500) {
+      e.stuck = 0;
+      const [dx, dy] = DIRS[e.wantDir || 'down'];
+      const rr = Math.floor((e.y + dy * TILE * 0.7) / TILE), cc = Math.floor((e.x + dx * TILE * 0.7) / TILE);
+      if (grid[rr] && grid[rr][cc] === T_BRICK) {
+        grid[rr][cc] = T_EMPTY;
+        spawnParticles(cc * TILE + TILE / 2, rr * TILE + TILE / 2, '#c9694a', 8);
+        sfx.brick();
+      }
+    }
+  } else { e.tread = (e.tread || 0) + eSpeed; e.stuck = 0; }
 
   // башта дивиться по ходу корпусу — чесно, як у гравця
   e.turretAngle = DIR_ANGLE[e.dir];
@@ -1067,6 +1104,7 @@ function updateBullets(dt) {
       if (b.fromPlayer) {
         gridHp[r][c] -= b.dmg;
         battle.dmgDealt += b.dmg;
+        battle.pts += b.dmg * PTS.hqDmg; battle.ptsTotal += b.dmg * PTS.hqDmg;
         sfx.hit();
         spawnParticles(b.x, b.y, '#ff4d5e', 6);
         if (gridHp[r][c] <= 0) destroyHQ(r, c);
@@ -1096,6 +1134,7 @@ function updateBullets(dt) {
           b.dead = true;
           e.hp -= b.dmg;
           battle.dmgDealt += b.dmg;
+          battle.pts += b.dmg * PTS.dmg; battle.ptsTotal += b.dmg * PTS.dmg;
           if (player.cryo) e.slowT = 2000; // кріо-снаряди
           sfx.hit();
           spawnParticles(b.x, b.y, e.color, 5);
@@ -1253,6 +1292,7 @@ function killEnemy(e) {
   spawnParticles(e.x, e.y, e.color, e.type === 'boss' ? 40 : 14);
 
   battle.frags++;
+  battle.pts += PTS.frag; battle.ptsTotal += PTS.frag;
   // анти-ферма: у штурмі після 20 фрагів нагорода за фраги вичерпана
   const farmed = battle.mode === 'assault' && battle.frags > 30;
   if (!farmed) {
@@ -1541,6 +1581,34 @@ function updateModifiers(dt) {
   }
 }
 
+// ---------- Ящик постачання: за нього треба доїхати під вогнем ----------
+function dropSupplyCrate() {
+  let best = null, bestScore = -1;
+  for (let i = 0; i < 60; i++) {
+    const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+    const c = Math.floor(Math.random() * COLS);
+    if (grid[r][c] !== T_EMPTY && grid[r][c] !== T_SAND && grid[r][c] !== T_ICE) continue;
+    // має бути хоча б два вільні сусіди — інакше це глухий кут
+    let open = 0;
+    for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+      const t = grid[rr][cc];
+      if (t === T_EMPTY || t === T_SAND || t === T_ICE || t === T_BUSH) open++;
+    }
+    if (open < 2) continue;
+    const x = c * TILE + TILE / 2, y = r * TILE + TILE / 2;
+    const d = Math.hypot(x - player.x, y - player.y);
+    // не під носом і не на іншому кінці карти — цікава дистанція
+    const score = d > 110 && d < 420 ? d : -1;
+    if (score > bestScore) { bestScore = score; best = { x, y }; }
+  }
+  if (!best) best = { x: W / 2, y: H / 2 };
+  drops.push({ x: best.x, y: best.y, kind: 'crate', ttl: 30000 });
+  sfx.perk();
+  floatText(best.x, best.y - 26, '📦 ПОСТАЧАННЯ!', '#ffd23f');
+}
+
 // ---------- Аптечка (одна на бій, клавіша E) ----------
 function useMedkit() {
   if (state !== 'play' || !battle.medkit || player.hp >= player.maxHp) return;
@@ -1554,13 +1622,24 @@ function useMedkit() {
 function updateDrops(dt) {
   for (const d of drops) {
     d.ttl -= dt;
-    if (d.ttl <= 0) { d.dead = true; continue; }
+    if (d.ttl <= 0) {
+      d.dead = true;
+      if (d.kind === 'crate') { battle.crateOut = false; battle.pts += SUPPLY_COST * 0.6; }
+      continue;
+    }
     if (Math.abs(d.x - player.x) < 28 && Math.abs(d.y - player.y) < 28) {
       d.dead = true;
       sfx.pickup();
       if (d.kind === 'med') { player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.3)); floatText(d.x, d.y, '+HP', '#ff8c69'); }
       else if (d.kind === 'star') { battle.credits += 120; floatText(d.x, d.y, '+120 🪙', '#ffd23f'); }
       else if (d.kind === 'freeze') { freezeTimer = 4000; floatText(d.x, d.y, 'ЗАМОРОЗКА!', '#6fd3ff'); }
+      else if (d.kind === 'crate') {
+        battle.crateOut = false;
+        pendingPerks++;
+        sfx.perk();
+        openPerkMenu();
+        return;
+      }
     }
   }
   drops = drops.filter(d => !d.dead);
@@ -2127,7 +2206,20 @@ function draw() {
     ctx.font = '22px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(d.kind === 'med' ? '💊' : d.kind === 'star' ? '⭐' : '❄️', d.x, d.y);
+    if (d.kind === 'crate') {
+      const pl = 0.7 + Math.sin(performance.now() / 250) * 0.3;
+      ctx.save();
+      ctx.shadowColor = '#ffd23f';
+      ctx.shadowBlur = 16 * pl;
+      ctx.font = '26px monospace';
+      ctx.fillText('📦', d.x, d.y);
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,210,63,' + (0.35 + pl * 0.4) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(d.x, d.y, 20 + pl * 5, 0, 7); ctx.stroke();
+    } else {
+      ctx.fillText(d.kind === 'med' ? '💊' : d.kind === 'star' ? '⭐' : '❄️', d.x, d.y);
+    }
   }
 
   // міни (ледь помітні — дивись уважно!)
@@ -2299,9 +2391,25 @@ function drawHud() {
   ctx.textAlign = 'center';
   ctx.fillStyle = leftMs < 30000 ? '#ff4d5e' : '#d7e0f0';
   ctx.fillText(`⏱ ${mm}:${String(ss).padStart(2, '0')}`, W / 2 - 42, midY);
-  ctx.font = 'bold 14px monospace';
-  ctx.fillStyle = sec <= 5 ? '#39ff88' : '#8fa2c4';
-  ctx.fillText(`📦 ${sec}с`, W / 2 + 52, midY);
+  // прогрес до наступного постачання (заробляється боєм)
+  const pf = Math.min(1, battle.pts / SUPPLY_COST);
+  const bx = W / 2 + 18, bw = 66;
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(bx, midY - 6, bw, 12);
+  ctx.fillStyle = battle.crateOut ? '#ffd23f' : '#39ff88';
+  ctx.fillRect(bx, midY - 6, bw * (battle.crateOut ? 1 : pf), 12);
+  ctx.strokeStyle = '#263149'; ctx.lineWidth = 1;
+  ctx.strokeRect(bx, midY - 6, bw, 12);
+  ctx.font = 'bold 12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#8fa2c4';
+  ctx.fillText(battle.crateOut ? '📦 на карті!' : '📦', bx + bw + 6, midY);
+
+  // номер хвилі
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillStyle = battle.waveFlash > 0 ? '#ff4d5e' : '#8fa2c4';
+  ctx.fillText('🌊' + battle.wave, 250, midY);
 
   // праворуч: аптечка
   ctx.textAlign = 'right';
@@ -2415,6 +2523,22 @@ function drawHud() {
     ctx.globalAlpha = 1;
   }
 
+  // ---- банер нової хвилі ----
+  if (battle.waveFlash > 0) {
+    const a = Math.min(1, battle.waveFlash / 600);
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff4d5e';
+    ctx.font = 'bold 30px monospace';
+    ctx.shadowColor = '#ff4d5e'; ctx.shadowBlur = 18;
+    ctx.fillText('🌊 ХВИЛЯ ' + battle.wave, W / 2, HUD_TOP + 70);
+    ctx.shadowBlur = 0;
+    ctx.font = '13px monospace';
+    ctx.fillStyle = '#d7e0f0';
+    ctx.fillText('вороги міцніші та швидші', W / 2, HUD_TOP + 94);
+    ctx.globalAlpha = 1;
+  }
+
   // ---- вступний банер ----
   if (battle.introT > 0) {
     const a = Math.min(1, battle.introT / 700);
@@ -2464,20 +2588,23 @@ function loop(now) {
     return;
   }
 
-  // постачання доктрин раз на ~45 секунд, з відліком-попередженням
-  battle.supply += dt;
-  const supplySec = Math.ceil((SUPPLY_MS - battle.supply) / 1000);
-  if (supplySec <= 5 && supplySec >= 1 && supplySec !== battle.lastTick) {
-    battle.lastTick = supplySec;
-    beep(500 + (5 - supplySec) * 80, 0.08, 'sine', 0.06);
+  // ---- ХВИЛІ: кожні 40 с ворог присилає злішу хвилю ----
+  battle.waveT += dt;
+  if (battle.waveT >= 40000) {
+    battle.waveT = 0;
+    battle.wave++;
+    battle.waveFlash = 2200;
+    sfx.boom();
+    shakeTime = 250;
+    floatText(player.x, player.y - 46, '⚠ ХВИЛЯ ' + battle.wave + '!', '#ff4d5e');
   }
-  if (battle.supply >= SUPPLY_MS) {
-    battle.supply = 0;
-    battle.lastTick = 0;
-    pendingPerks++;
-    sfx.perk();
-    openPerkMenu();
-    return;
+  if (battle.waveFlash > 0) battle.waveFlash -= dt;
+
+  // ---- ПОСТАЧАННЯ: заробляється боєм, і його треба ПІДІБРАТИ ----
+  if (battle.pts >= SUPPLY_COST && !battle.crateOut) {
+    battle.pts -= SUPPLY_COST;
+    battle.crateOut = true;
+    dropSupplyCrate();
   }
 
   updateModifiers(dt);
@@ -2825,7 +2952,7 @@ fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = fals
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v17 · дві бази: атакуй ☭ і захищай ★';
+const GAME_VERSION = 'v18 · зароблені доктрини · хвилі · фікс застрягань';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
