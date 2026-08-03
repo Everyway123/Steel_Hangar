@@ -1051,7 +1051,7 @@ function updateEnemy(e, dt) {
       e.wantDir = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
       e.dir = e.wantDir;
       e.thinkTimer = 400;
-      e.cooldown = 700;
+      e.cooldown = 350; // час на доведення ствола: 700 мс з'їдало половину темпу вогню
     } else if (dist < range && battle.idle > 10000) {
       // анти-кемпінг: по нерухомому гравцю б'ють навісом через стіни
       if (!battle.arcWarned) {
@@ -1062,6 +1062,12 @@ function updateEnemy(e, dt) {
       e.turretAngle = ang;
       fireBullet(e, ang, 3.3, e.dmg, false, true);
       e.cooldown = e.fireCd * 1.5;
+    } else if (canFire && dist < range * 1.3 && diff < 1.2) {
+      // чистої лінії нема, але гравець попереду — б'є в його бік і розносить
+      // цеглу на шляху. Без цього у щільному лабіринті вороги мовчать увесь бій
+      shoot(e, false);
+      e.cooldown = e.fireCd + Math.random() * 500;
+      battle.enemyShotCd = enemyFireGap();
     } else {
       e.cooldown = 250;
     }
@@ -3055,7 +3061,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v20 · фікс: танк більше не замурований у власній базі + мобільна версія';
+const GAME_VERSION = 'v21 · фікси: рух танка, ящик постачання, вороги стріляють';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
