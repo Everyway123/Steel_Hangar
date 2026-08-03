@@ -132,7 +132,7 @@ function tankSave(id) {
 // ---------- Карти боїв ----------
 // '.'=пусто '#'=цегла '@'=сталь '~'=вода '*'=кущі 's'=пісок 'o'=бочка 'H'=штаб
 // 'P'=гравець 'E'=спавн ворогів
-// mode: 'clear' — знищ усіх ворогів; 'assault' — знищ штаб, вороги нескінченні
+// mode: 'clear' — знищ усіх ворогів; 'assault' — знищ штаб, підкріплення обмежені
 const MAPS = [
   { name: 'Полігон', mode: 'clear', map: [
     'E......EE......E',
@@ -434,6 +434,14 @@ const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 let grid, gridHp, player, enemies, bullets, particles, drops;
+// у зібраному одному файлі (артефакт) <head> береться від хоста і meta viewport губиться —
+// без неї телефон малює сторінку в 980px-макеті і все стискається вдвічі
+if (!document.querySelector('meta[name="viewport"]')) {
+  const mv = document.createElement('meta');
+  mv.name = 'viewport';
+  mv.content = 'width=device-width, initial-scale=1.0, user-scalable=no';
+  document.head.appendChild(mv);
+}
 // телефон/планшет визначаємо одразу: без підказок клавіш у HUD і з автоприцілом з першого пострілу
 const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 let touchMode = IS_TOUCH; // на тачі точного керування нема — там лишається автоприціл
@@ -696,7 +704,11 @@ function startBattle(sector) {
   const baseHp = 12 + 4 * st.tier;
   // ворожа база — вгорі по центру (якщо карта не має власних штабів)
   if (battle.hqLeft === 0) {
-    putBase(1, Math.floor(COLS / 2) - 1, T_HQ, baseHp, 'down'); // підхід знизу відкритий
+    // штаб зсунуто вбік від колонки гравця: інакше відкритий бік муру дивиться
+    // просто на спавн і бій виграється пострілом угору за 8 секунд без руху
+    const pcol = Math.floor(player.x / TILE);
+    const hc = Math.max(1, Math.min(COLS - 2, pcol + (pcol < COLS / 2 ? 3 : -3)));
+    putBase(1, hc, T_HQ, baseHp, 'down'); // підхід знизу відкритий
     battle.hqLeft = 1;
   }
   // твоя база — ПІД спавном гравця, ніколи не на ньому:
@@ -2582,7 +2594,7 @@ function drawHud() {
     ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ' : ''), W / 2, cy + 16);
     ctx.fillStyle = '#8fa2c4';
     ctx.font = '13px monospace';
-    let sub = battle.mode === 'assault' ? 'Вороги нескінченні — прорвися і знеси штаб' : '';
+    let sub = battle.mode === 'assault' ? 'Підкріплення йдуть — прорвися і знеси ☭ штаб' : '';
     if (battle.mod) sub = (sub ? sub + '  ·  ' : '') + MOD_INFO[battle.mod].ico + ' ' + MOD_INFO[battle.mod].name;
     if (sub) ctx.fillText(sub, W / 2, cy + 40);
     ctx.globalAlpha = 1;
