@@ -115,6 +115,7 @@ function defaultSave() {
     current: 'kadet',
     tanks: { kadet: { researched: true, owned: true, xp: 0, modules: { gun: 0, armor: 0, engine: 0 } } },
     front: { level: 1, liberated: ['plazdarm'] },
+    codex: [],
   };
 }
 function loadSave() {
@@ -126,6 +127,7 @@ function loadSave() {
     const k = tankSave('kadet');
     k.researched = true; k.owned = true;
     if (!save.front) save.front = { level: 1, liberated: ['plazdarm'] };
+    if (!Array.isArray(save.codex)) save.codex = [];
   } catch (e) { save = defaultSave(); }
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
@@ -750,7 +752,8 @@ function startBattle(sector) {
   putBase(pr, pc, T_HOME, baseHp, 'up'); // гравець заїжджає згори
   clearSpawns();
   freePlayerSpot();
-  for (const k of FIELD_MOD_KEYS) player[FIELD_MODS[k].key] = 0;
+  player.buffs = []; player.fragile = 1;
+  battle.helper = null;
   battle.homeHp = baseHp; battle.homeMax = baseHp;
   battle.homeR = pr; battle.homeC = pc;
 
@@ -770,6 +773,30 @@ function startBattle(sector) {
       if (grid[r][c] === T_EMPTY && Math.hypot(x - player.x, y - player.y) > 140) {
         battle.mines.push({ x, y });
       }
+    }
+  }
+
+  // ворожі гармати стали злішими — карта має давати де сховатись.
+  // Кущі не блокують рух, але ховають танк від чужих очей і від наведення
+  {
+    let planted = 0, tries = 0;
+    while (planted < 14 && tries++ < 400) {
+      const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+      const c = Math.floor(Math.random() * COLS);
+      if (grid[r][c] !== T_EMPTY) continue;
+      const x = c * TILE + TILE / 2, y = r * TILE + TILE / 2;
+      if (Math.hypot(x - player.x, y - player.y) < 100) continue;
+      // сховок має бути біля укриття, а не серед голого поля
+      let nearWall = 0;
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const rr = r + dr, cc = c + dc;
+        if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+        const t = grid[rr][cc];
+        if (t === T_BRICK || t === T_STEEL || t === T_BUSH) nearWall++;
+      }
+      if (!nearWall) continue;
+      grid[r][c] = T_BUSH;
+      planted++;
     }
   }
 
@@ -931,13 +958,14 @@ function fireBullet(tank, ang, speed, dmg, fromPlayer, overWalls) {
 
 function shoot(tank, isPlayer) {
   if (isPlayer) {
-    const twin = player.doubleShot || (player.twinT || 0) > 0;
+    const twin = player.doubleShot || player.twin;
     const angles = twin
       ? [player.turretAngle - 0.07, player.turretAngle + 0.07]
       : [player.turretAngle];
+    const berserkMult = player.berserk ? 1 + 1.5 * (1 - player.hp / player.maxHp) : 1;
     for (const a of angles) {
-      const homes = player.homingRounds || (player.homeT || 0) > 0;
-      fireBullet(tank, a, homes ? player.bulletSpeed * 0.8 : player.bulletSpeed, player.dmg, true);
+      const homes = player.homingRounds || player.homes;
+      fireBullet(tank, a, homes ? player.bulletSpeed * 0.8 : player.bulletSpeed, player.dmg * berserkMult, true);
       if (homes) bullets[bullets.length - 1].homing = 'enemy';
     }
   } else {
@@ -946,10 +974,10 @@ function shoot(tank, isPlayer) {
     const spread = 0.12 + Math.min(0.4, distP / 900); // впритул точні, здалеку мажуть
     const ang = Math.atan2(player.y - tank.y, player.x - tank.x) + (Math.random() - 0.5) * spread * 2;
     tank.turretAngle = ang;
-    const angs = (tank.twinT || 0) > 0 ? [ang - 0.07, ang + 0.07] : [ang];
+    const angs = tank.twin ? [ang - 0.07, ang + 0.07] : [ang];
     for (const a of angs) {
       fireBullet(tank, a, 3.6, tank.dmg, false);
-      if ((tank.homeT || 0) > 0) bullets[bullets.length - 1].homing = 'player';
+      if (tank.homes) bullets[bullets.length - 1].homing = 'player';
     }
   }
 }
@@ -1016,7 +1044,7 @@ function updateEnemy(e, dt) {
       e.wantDir = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)];
     }
   }
-  for (const k of FIELD_MOD_KEYS) { const f = FIELD_MODS[k].key; if (e[f] > 0) { e[f] -= dt; if (e[f] <= 0) e.buffIco = null; } }
+  updateBuffs(e, dt);
   if (e.flash > 0) e.flash -= dt;
   if (e.slowT > 0) e.slowT -= dt;
   const eSpeed = e.speed * (tileAt(e.x, e.y) === T_SAND ? 0.7 : tileAt(e.x, e.y) === T_ICE ? 1.25 : 1) * (e.slowT > 0 ? 0.55 : 1) * (battle.speedMult || 1);
@@ -1048,7 +1076,10 @@ function updateEnemy(e, dt) {
     const angP = Math.atan2(player.y - e.y, player.x - e.x);
     const facing = DIR_ANGLE[e.dir];
     const diff = Math.abs(((angP - facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-    const los = dist < range && hasLOS(e.x, e.y, player.x, player.y);
+    // у кущах і за димогенератором дальність виявлення різко падає
+    const hidden = tileAt(player.x, player.y) === T_BUSH ? 0.45 : 1;
+    const visMult = hidden * (player.lowVis ? 0.5 : 1);
+    const los = dist < range * visMult && hasLOS(e.x, e.y, player.x, player.y);
 
     // впритул конус ширший — в упор не промахуються
     const cone = dist < 120 ? 0.8 : 0.5;
@@ -1067,7 +1098,7 @@ function updateEnemy(e, dt) {
     } else if (los && diff < cone && canFire) {
       e.turretAngle = angP;
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
-      e.cooldown = (e.fireCd + Math.random() * 400) * ((e.rapidT || 0) > 0 ? 0.55 : 1);
+      e.cooldown = (e.fireCd + Math.random() * 400) * (e.rapid ? 0.55 : 1);
       battle.enemyShotCd = enemyFireGap();
     } else if (canFire && grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME &&
                (() => {
@@ -1244,27 +1275,45 @@ function updateBullets(dt) {
           sfx.hit();
           spawnParticles(b.x, b.y, e.color, 5);
           // фугасні снаряди: вибух зачіпає ворогів поруч
-          if (player.explosiveRounds || (player.heatT || 0) > 0) {
+          if (player.explosiveRounds || player.heat) {
             spawnParticles(b.x, b.y, '#ff9d3c', 10);
             for (const o of enemies) {
               if (o === e || o.dead || o.spawning > 0) continue;
-              if (Math.hypot(o.x - b.x, o.y - b.y) < 55) {
+              if (Math.hypot(o.x - b.x, o.y - b.y) < (player.unstable ? 85 : 55)) {
                 o.hp -= b.dmg * 0.4;
                 battle.dmgDealt += b.dmg * 0.4;
                 if (o.hp <= 0) killEnemy(o);
               }
             }
           }
+          if (player.unstable && Math.hypot(player.x - b.x, player.y - b.y) < 85) {
+            player.hp = Math.max(1, player.hp - 1);
+            floatText(player.x, player.y - 18, '💣-1', '#ff9d3c');
+          }
           if (e.hp <= 0) killEnemy(e);
           break;
         }
+      }
+    } else if (battle.helper && !battle.helper.dead &&
+               Math.abs(b.x - battle.helper.x) < battle.helper.size / 2 &&
+               Math.abs(b.y - battle.helper.y) < battle.helper.size / 2) {
+      b.dead = true;
+      battle.helper.hp -= b.dmg;
+      battle.helper.flash = 90;
+      sfx.hit();
+      spawnParticles(b.x, b.y, '#6fd3ff', 5);
+      if (battle.helper.hp <= 0) {
+        battle.helper.dead = true;
+        spawnParticles(battle.helper.x, battle.helper.y, '#6fd3ff', 22);
+        floatText(battle.helper.x, battle.helper.y - 22, '🤝 помічника знищено', '#ff4d5e');
+        sfx.boom();
       }
     } else if (player.invuln <= 0 &&
                Math.abs(b.x - player.x) < player.size / 2 &&
                Math.abs(b.y - player.y) < player.size / 2) {
       b.dead = true;
       // РИКОШЕТ: шанс залежить від броні — фішка важких танків
-      const ricoChance = Math.min(0.45, player.armor * 0.06);
+      const ricoChance = Math.min(0.45, Math.max(0, player.armor) * 0.06);
       if (Math.random() < ricoChance) {
         battle.ricochets++;
         sfx.rico();
@@ -1278,7 +1327,7 @@ function updateBullets(dt) {
           });
         }
       } else {
-        const dmg = Math.max(1, Math.round(b.dmg - player.armor * 0.7));
+        const dmg = Math.max(1, Math.round((b.dmg - Math.max(0, player.armor) * 0.7) * (player.fragile || 1)));
         player.hp -= dmg;
         battle.dmgTaken += dmg;
         player.invuln = player.smoke ? 2000 : 600; // димова завіса подовжує невразливість
@@ -1322,7 +1371,7 @@ function explodeBarrel(r, c) {
     }
   }
   if (Math.hypot(player.x - bx, player.y - by) < R && player.invuln <= 0) {
-    const dmg = Math.max(1, 5 - player.armor);
+    const dmg = Math.max(1, Math.round((5 - Math.max(0, player.armor)) * (player.fragile || 1)));
     player.hp -= dmg;
     battle.dmgTaken += dmg;
     player.invuln = 600;
@@ -1645,7 +1694,7 @@ function modExplosion(x, y, R, dmgP, dmgE) {
     }
   }
   if (Math.hypot(player.x - x, player.y - y) < R && player.invuln <= 0) {
-    const dmg = Math.max(1, dmgP - player.armor);
+    const dmg = Math.max(1, Math.round((dmgP - Math.max(0, player.armor)) * (player.fragile || 1)));
     player.hp -= dmg;
     battle.dmgTaken += dmg;
     player.invuln = 600;
@@ -1697,21 +1746,152 @@ function updateModifiers(dt) {
 // ---------- Ящик постачання: за нього треба доїхати під вогнем ----------
 // Трофеї на карті: заїдь — і на 25 с отримуєш зброю, якої в тебе нема.
 // Це «більше таких речей» — сила, яку знаходиш і мусиш дійти, а не отримуєш даром.
-const FIELD_MODS = {
-  gun:    { ico: '🔫', name: 'ДРУГИЙ СТВОЛ',   key: 'twinT',  ms: 25000, hud: '🔫' },
-  homing: { ico: '🛰', name: 'САМОНАВЕДЕННЯ',  key: 'homeT',  ms: 20000, hud: '🛰' },
-  heat:   { ico: '☄', name: 'ФУГАСИ',         key: 'heatT',  ms: 20000, hud: '☄' },
-  rapid:  { ico: '⚡', name: 'АВТОЗАРЯДЖАННЯ', key: 'rapidT', ms: 18000, hud: '⚡' },
+// ============================================================
+//  25 ТРОФЕЙНИХ КОРОБОК
+//  plus     — чистий бонус, брати завжди безпечно
+//  tradeoff — сила за ціну; числа навмисно більші, інакше їх не братимуть
+//  enemy    — чи має сенс для ворога (мародер чи ремонт бази — не має)
+//  Правила безпеки: мінус НІКОЛИ не вбиває (клемп на 1 HP),
+//  одночасно не більше MAX_BUFFS активних.
+// ============================================================
+const MAX_BUFFS = 3;
+
+const CRATES = {
+  // ---------- ЗБРОЯ (чистий плюс) ----------
+  twin:    { ico: '🔫', name: 'ДРУГИЙ СТВОЛ',    kind: 'plus', rar: 1, ms: 25000, enemy: true,  desc: 'два снаряди віялом',
+             on: t => t.twin = true,  off: t => t.twin = false },
+  homing:  { ico: '🛰', name: 'САМОНАВЕДЕННЯ',   kind: 'plus', rar: 2, ms: 20000, enemy: true,  desc: 'снаряди довертають до цілі',
+             on: t => t.homes = true, off: t => t.homes = false },
+  heat:    { ico: '☄', name: 'ФУГАСИ',          kind: 'plus', rar: 2, ms: 20000, enemy: true,  desc: 'влучання вибухає по площі',
+             on: t => t.heat = true,  off: t => t.heat = false },
+  rapid:   { ico: '⚡', name: 'АВТОЗАРЯДЖАННЯ',  kind: 'plus', rar: 1, ms: 18000, enemy: true,  desc: 'перезарядка вдвічі швидша',
+             on: t => t.rapid = true, off: t => t.rapid = false },
+  ap:      { ico: '🎯', name: 'БРОНЕБІЙНІ',      kind: 'plus', rar: 1, ms: 18000, enemy: true,  desc: '+60% урону',
+             on: t => t.dmg *= 1.6,   off: t => t.dmg /= 1.6 },
+  cryo:    { ico: '🧊', name: 'КРІО-СНАРЯДИ',    kind: 'plus', rar: 1, ms: 20000, enemy: false, desc: 'влучання сповільнює ворога',
+             on: t => t.cryo = true,  off: t => t.cryo = false },
+  // ---------- ЗАХИСТ ----------
+  plates:  { ico: '🛡', name: 'ДИНАМІЧНИЙ ЗАХИСТ', kind: 'plus', rar: 1, ms: 22000, enemy: true, desc: '+2 броні, більше рикошетів',
+             on: t => t.armor += 2,   off: t => t.armor = Math.max(0, t.armor - 2) },
+  repair:  { ico: '❤️', name: 'РЕМКОМПЛЕКТ',     kind: 'plus', rar: 1, instant: true, enemy: true, desc: '+40% міцності одразу',
+             on: t => t.hp = Math.min(t.maxHp, t.hp + Math.ceil(t.maxHp * 0.4)) },
+  engineer:{ ico: '🧱', name: 'ІНЖЕНЕРНИЙ НАБІР', kind: 'plus', rar: 2, instant: true, enemy: false, desc: 'відбудовує мур навколо твоєї бази ★',
+             on: () => rebuildHomeWall() },
+  // ---------- МОБІЛЬНІСТЬ ----------
+  nitro:   { ico: '🚀', name: 'ФОРСАЖ',          kind: 'plus', rar: 1, ms: 20000, enemy: true,  desc: '+35% швидкості',
+             on: t => t.speed *= 1.35, off: t => t.speed /= 1.35 },
+  ghost:   { ico: '💨', name: 'ДИМОГЕНЕРАТОР',   kind: 'plus', rar: 2, ms: 16000, enemy: false, desc: 'вороги бачать тебе вдвічі гірше',
+             on: t => t.lowVis = true, off: t => t.lowVis = false },
+  // ---------- ТАКТИКА ----------
+  xray:    { ico: '🕵', name: 'РОЗВІДКА',        kind: 'plus', rar: 2, ms: 25000, enemy: false, desc: 'бачиш ворогів крізь стіни й туман',
+             on: () => battle.xray = true, off: () => battle.xray = false },
+  freeze:  { ico: '❄️', name: 'ЗАМОРОЗКА',       kind: 'plus', rar: 2, instant: true, enemy: false, desc: 'усі вороги завмирають на 4 с',
+             on: () => { freezeTimer = 4000; } },
+  loot:    { ico: '💰', name: 'МАРОДЕР',         kind: 'plus', rar: 1, instant: true, enemy: false, desc: '+80% срібла за фраги до кінця бою',
+             on: () => { battle.lootMult = (battle.lootMult || 1) * 1.8; } },
+  // ---------- ПЛЮС-МІНУС ----------
+  assault: { ico: '⚔', name: 'ШТУРМОВИЙ ЗАРЯД', kind: 'tradeoff', rar: 2, ms: 20000, enemy: true, desc: '×2 урону, але одразу −35% міцності',
+             on: t => { t.dmg *= 2; t.hp = Math.max(1, t.hp - Math.floor(t.maxHp * 0.35)); }, off: t => t.dmg /= 2 },
+  light:   { ico: '🏎', name: 'ПОЛЕГШЕНИЙ КОРПУС', kind: 'tradeoff', rar: 1, ms: 22000, enemy: true, desc: '+50% швидкості, але −2 броні',
+             on: t => { t.speed *= 1.5; t.armorCut = Math.min(2, t.armor); t.armor -= t.armorCut; },
+             off: t => { t.speed /= 1.5; t.armor += t.armorCut || 0; t.armorCut = 0; } },
+  concrete:{ ico: '🐌', name: 'БЕТОННІ ГУСЕНИЦІ', kind: 'tradeoff', rar: 1, ms: 22000, enemy: true, desc: '+4 броні, але −40% швидкості',
+             on: t => { t.armor += 4; t.speed *= 0.6; }, off: t => { t.armor = Math.max(0, t.armor - 4); t.speed /= 0.6; } },
+  overheat:{ ico: '🔥', name: 'ПЕРЕГРІВ СТВОЛА', kind: 'tradeoff', rar: 2, ms: 16000, enemy: false, desc: 'перезарядка ×0.35, але кожен постріл б\'є тебе на 1',
+             on: t => t.overheat = true, off: t => t.overheat = false },
+  unstable:{ ico: '💣', name: 'НЕСТАБІЛЬНІ БК',  kind: 'tradeoff', rar: 2, ms: 18000, enemy: false, desc: 'величезні фугаси, але вибух ранить і тебе',
+             on: t => { t.heat = true; t.unstable = true; }, off: t => { t.heat = false; t.unstable = false; } },
+  vampire: { ico: '🩸', name: 'ВАМПІР',          kind: 'tradeoff', rar: 2, ms: 24000, enemy: false, desc: 'фраг лікує 4 HP, але ти отримуєш +30% урону',
+             on: t => { t.vampire = true; t.fragile = 1.3; }, off: t => { t.vampire = false; t.fragile = 1; } },
+  sniper:  { ico: '👁', name: 'СНАЙПЕРСЬКИЙ РЕЖИМ', kind: 'tradeoff', rar: 2, ms: 20000, enemy: false, desc: 'снаряд удвічі швидший і б\'є далі, але −45% швидкості',
+             on: t => { t.bulletSpeed *= 2; t.speed *= 0.55; }, off: t => { t.bulletSpeed /= 2; t.speed /= 0.55; } },
+  berserk: { ico: '😤', name: 'БЕРСЕРК',         kind: 'tradeoff', rar: 3, ms: 18000, enemy: false, desc: 'чим менше HP, тим більший урон — до ×2.5',
+             on: t => t.berserk = true, off: t => t.berserk = false },
+  lottery: { ico: '🎲', name: 'ЛОТЕРЕЯ',         kind: 'tradeoff', rar: 3, instant: true, enemy: false, desc: 'випадковий трофей — може бути будь-який',
+             on: t => {
+               const pool = CRATE_KEYS.filter(k => k !== 'lottery' && k !== 'reactor');
+               applyCrate(t, pool[Math.floor(Math.random() * pool.length)], true);
+             } },
+  helper:  { ico: '🤝', name: 'ПОМІЧНИК',         kind: 'plus', rar: 3, instant: true, enemy: false, desc: 'дружній танк приєднується до бою до кінця раунду',
+             on: () => spawnHelper() },
+  reactor: { ico: '☢', name: 'РЕАКТОР',          kind: 'tradeoff', rar: 3, instant: true, enemy: false, desc: 'подвоює час усіх активних трофеїв, але забирає аптечку',
+             on: t => {
+               (t.buffs || []).forEach(b => b.left *= 2);
+               if (t === player) battle.medkit = false;
+             } },
 };
-const FIELD_MOD_KEYS = Object.keys(FIELD_MODS);
+const CRATE_KEYS = Object.keys(CRATES);
+// ваги: рідкісні трапляються рідше, але саме вони найсоковитіші
+const CRATE_WEIGHT = { 1: 5, 2: 3, 3: 1 };
+
+// ---------- Рушій трофеїв ----------
+function applyCrate(t, id, silent) {
+  const def = CRATES[id];
+  if (!def) return;
+  if (!t.buffs) t.buffs = [];
+  if (def.instant) { def.on(t); if (!silent) floatText(t.x, t.y - 30, `${def.ico} ${def.name}!`, '#ffd23f'); return; }
+  const same = t.buffs.find(b => b.id === id);
+  if (same) { same.left = Math.max(same.left, def.ms); return; }
+  // більше MAX_BUFFS не тримаємо: інакше комбінації нікому не перевірити
+  while (t.buffs.length >= MAX_BUFFS) removeBuff(t, t.buffs[0].id);
+  t.buffs.push({ id, left: def.ms });
+  def.on(t);
+  if (t.hp !== undefined) t.hp = Math.max(1, t.hp); // мінус не має вбивати
+  if (!silent) floatText(t.x, t.y - 30, `${def.ico} ${def.name}!`, def.kind === 'tradeoff' ? '#c07eff' : '#ffd23f');
+}
+
+function removeBuff(t, id) {
+  const i = (t.buffs || []).findIndex(b => b.id === id);
+  if (i < 0) return;
+  t.buffs.splice(i, 1);
+  const def = CRATES[id];
+  if (def && def.off) def.off(t);
+}
+
+function updateBuffs(t, dt) {
+  if (!t.buffs || !t.buffs.length) return;
+  for (const b of t.buffs.slice()) {
+    b.left -= dt;
+    if (b.left <= 0) removeBuff(t, b.id);
+  }
+  t.buffIco = t.buffs.length ? CRATES[t.buffs[t.buffs.length - 1].id].ico : null;
+}
+
+function rollCrate(forEnemyToo) {
+  const pool = [];
+  for (const k of CRATE_KEYS) {
+    if (forEnemyToo && !CRATES[k].enemy) continue;
+    const w = CRATE_WEIGHT[CRATES[k].rar] || 1;
+    for (let i = 0; i < w; i++) pool.push(k);
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 function dropGunEmplacements(n) {
-  const pool = FIELD_MOD_KEYS.slice();
+  const used = new Set();
   for (let i = 0; i < n; i++) {
     const spot = findOpenSpot(150, 520);
     if (!spot) continue;
-    const kind = pool.splice(Math.floor(Math.random() * pool.length), 1)[0] || 'gun';
+    let kind = rollCrate();
+    for (let tries = 0; used.has(kind) && tries < 12; tries++) kind = rollCrate();
+    used.add(kind);
     drops.push({ x: spot.x, y: spot.y, kind, ttl: BATTLE_LIMIT_MS });
+    if (save.codex && !save.codex.includes(kind)) { save.codex.push(kind); persist(); }
+  }
+}
+
+// інженерний набір: відбудовує П-подібний мур навколо твоєї бази
+function rebuildHomeWall() {
+  const r0 = battle.homeR, c0 = battle.homeC;
+  if (r0 === undefined) return;
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (dr === -1 || (dr === 0 && dc === 0)) continue;
+    const rr = r0 + dr, cc = c0 + dc;
+    if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+    if (grid[rr][cc] === T_EMPTY || grid[rr][cc] === T_SAND || grid[rr][cc] === T_ICE) {
+      grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 6;
+      spawnParticles(cc * TILE + TILE / 2, rr * TILE + TILE / 2, '#c9694a', 6);
+    }
   }
 }
 
@@ -1775,6 +1955,61 @@ function useMedkit() {
   floatText(player.x, player.y - 30, '🔧 РЕМОНТ +50%', '#39ff88');
 }
 
+
+// ---------- ПОМІЧНИК: дружній бот-танк ----------
+// Баланс: 60% твоїх HP, 70% урону, без рикошету, живе до кінця раунду,
+// одночасно лише ОДИН. Він тисне і відтягує вогонь, але не виграє бій за тебе.
+function spawnHelper() {
+  if (battle.helper && !battle.helper.dead) { battle.helper.hp = battle.helper.maxHp; return; }
+  const spot = findOpenSpot(60, 220) || { x: player.x, y: player.y - TILE };
+  const hp = Math.max(6, Math.round(player.maxHp * 0.6));
+  const h = {
+    x: spot.x, y: spot.y, size: 32, dir: 'up', turretAngle: -Math.PI / 2,
+    hp, maxHp: hp, dmg: player.dmg * 0.7, speed: player.speed * 0.95,
+    fireCd: Math.round(player.fireCd * 1.3), cooldown: 600, thinkTimer: 0,
+    ally: true, dead: false, spawning: 0, tread: 0, flash: 0, cls: 'СТ',
+  };
+  battle.helper = h;
+  floatText(h.x, h.y - 26, '🤝 ПОМІЧНИК У БОЮ!', '#39ff88');
+  sfx.cash();
+}
+
+function updateHelper(dt) {
+  const h = battle.helper;
+  if (!h || h.dead) return;
+  if (h.flash > 0) h.flash -= dt;
+  h.thinkTimer -= dt;
+  // ціль — найближчий живий ворог
+  let tgt = null, bd = 1e9;
+  for (const e of enemies) {
+    if (e.dead || e.spawning > 0) continue;
+    const d = Math.hypot(e.x - h.x, e.y - h.y);
+    if (d < bd) { bd = d; tgt = e; }
+  }
+  if (h.thinkTimer <= 0) {
+    h.thinkTimer = 320 + Math.random() * 500;
+    const tx = tgt ? tgt.x : player.x, ty = tgt ? tgt.y : player.y;
+    const dx = tx - h.x, dy = ty - h.y;
+    h.wantDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+  }
+  if (!moveTank(h, h.wantDir || 'up', h.speed * (battle.speedMult || 1))) h.thinkTimer = 0;
+  else h.tread += h.speed;
+  h.turretAngle = DIR_ANGLE[h.dir];
+  h.cooldown -= dt;
+  if (tgt && bd < 460 && h.cooldown <= 0) {
+    const ang = Math.atan2(tgt.y - h.y, tgt.x - h.x);
+    const diff = Math.abs(((ang - DIR_ANGLE[h.dir] + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    const clear = hasLOS(h.x, h.y, tgt.x, tgt.y);
+    // б'є, коли ворог у секторі: чисту лінію в лабіринті чекати марно —
+    // без цього помічник просто катався й не стріляв жодного разу
+    if (diff < (clear ? 0.7 : 0.5)) {
+      h.turretAngle = clear ? ang : DIR_ANGLE[h.dir];
+      fireBullet(h, h.turretAngle, 6, h.dmg, true);
+      h.cooldown = h.fireCd;
+    }
+  }
+}
+
 // ---------- Дропи, частинки ----------
 function updateDrops(dt) {
   for (const d of drops) {
@@ -1789,11 +2024,14 @@ function updateDrops(dt) {
       if (e.dead || e.spawning > 0) continue;
       if (Math.abs(d.x - e.x) > 26 || Math.abs(d.y - e.y) > 26) continue;
       d.dead = true;
-      if (FIELD_MODS[d.kind]) {
-        const fm = FIELD_MODS[d.kind];
-        e[fm.key] = Math.max(e[fm.key] || 0, fm.ms);
-        e.buffIco = fm.ico;
-        floatText(d.x, d.y, `${fm.ico} ВОРОГ ЗАБРАВ!`, '#ff4d5e');
+      if (CRATES[d.kind]) {
+        if (CRATES[d.kind].enemy) {
+          applyCrate(e, d.kind, true);
+          e.buffIco = CRATES[d.kind].ico;
+          floatText(d.x, d.y, `${CRATES[d.kind].ico} ВОРОГ ЗАБРАВ!`, '#ff4d5e');
+        } else {
+          floatText(d.x, d.y, '💥 ворог знищив трофей', '#ff9d5c');
+        }
       } else if (d.kind === 'med') {
         e.hp = Math.min(e.maxHp, e.hp + Math.ceil(e.maxHp * 0.35));
         floatText(d.x, d.y, '💊 ворог полікувався', '#ff9d5c');
@@ -1814,11 +2052,7 @@ function updateDrops(dt) {
       if (d.kind === 'med') { player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.3)); floatText(d.x, d.y, '+HP', '#ff8c69'); }
       else if (d.kind === 'star') { battle.credits += 120; floatText(d.x, d.y, '+120 🪙', '#ffd23f'); }
       else if (d.kind === 'freeze') { freezeTimer = 4000; floatText(d.x, d.y, 'ЗАМОРОЗКА!', '#6fd3ff'); }
-      else if (FIELD_MODS[d.kind]) {
-        const fm = FIELD_MODS[d.kind];
-        player[fm.key] = Math.max(player[fm.key] || 0, fm.ms);
-        floatText(d.x, d.y, `${fm.ico} ${fm.name}! ${Math.round(fm.ms / 1000)} с`, '#ffd23f');
-      }
+      else if (CRATES[d.kind]) { sfx.perk(); applyCrate(player, d.kind); }
       else if (d.kind === 'crate') {
         battle.crateOut = false;
         pendingPerks++;
@@ -1859,7 +2093,7 @@ function updateParticles(dt) {
 // ---------- Гравець ----------
 function updatePlayer(dt) {
   if (player.invuln > 0) player.invuln -= dt;
-  for (const k of FIELD_MOD_KEYS) { const f = FIELD_MODS[k].key; if (player[f] > 0) player[f] -= dt; }
+  updateBuffs(player, dt);
   if (player.flash > 0) player.flash -= dt;
   player.cooldown -= dt;
   let dir = null;
@@ -1895,7 +2129,9 @@ function updatePlayer(dt) {
 
   if (keys.fire && player.cooldown <= 0) {
     shoot(player, true);
-    player.cooldown = player.fireCd * ((player.rapidT || 0) > 0 ? 0.5 : 1);
+    player.cooldown = player.fireCd * (player.overheat ? 0.35 : player.rapid ? 0.5 : 1);
+    // перегрів ствола: платиш здоров'ям за темп, але ніколи не вмираєш від цього
+    if (player.overheat) { player.hp = Math.max(1, player.hp - 1); floatText(player.x, player.y - 18, '🔥-1', '#ff9d3c'); }
   }
 
   // таран: корпус б'є ворогів при зіткненні
@@ -1913,6 +2149,10 @@ function updatePlayer(dt) {
           sfx.boom();
           spawnParticles((e.x + player.x) / 2, (e.y + player.y) / 2, '#ffd23f', 10);
           floatText(e.x, e.y - 20, '🥊 ТАРАН!', '#ff9d5c');
+          if (player.unstable && Math.hypot(player.x - b.x, player.y - b.y) < 85) {
+            player.hp = Math.max(1, player.hp - 1);
+            floatText(player.x, player.y - 18, '💣-1', '#ff9d3c');
+          }
           if (e.hp <= 0) killEnemy(e);
           break;
         }
@@ -2472,12 +2712,18 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(d.x, d.y, 20 + pl * 5, 0, 7); ctx.stroke();
     } else {
-      if (FIELD_MODS[d.kind]) {
+      if (CRATES[d.kind]) {
+        const cd = CRATES[d.kind];
         const pg = 0.6 + Math.sin(performance.now() / 300) * 0.4;
         ctx.save();
-        ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 12 * pg;
-        ctx.fillText(FIELD_MODS[d.kind].ico, d.x, d.y);
+        ctx.shadowColor = cd.kind === 'tradeoff' ? '#c07eff' : '#ffd23f';
+        ctx.shadowBlur = 14 * pg;
+        ctx.fillText(cd.ico, d.x, d.y);
         ctx.restore();
+        // фіолетова рамка = трофей з ціною
+        ctx.strokeStyle = cd.kind === 'tradeoff' ? 'rgba(192,126,255,.75)' : 'rgba(255,210,63,.6)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(d.x - 14, d.y - 14, 28, 28);
       } else {
         ctx.fillText(d.kind === 'med' ? '💊' : d.kind === 'star' ? '⭐' : '❄️', d.x, d.y);
       }
@@ -2493,6 +2739,16 @@ function draw() {
     ctx.fillStyle = '#ff4d5e';
     ctx.fillText('☢', m.x, m.y);
     ctx.globalAlpha = 1;
+  }
+
+  // помічник — блакитний, з підписом, щоб не сплутати з ворогом
+  if (battle.helper && !battle.helper.dead) {
+    const h = battle.helper;
+    drawTank(h, '#6fd3ff', false);
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6fd3ff';
+    ctx.fillText('🤝 свій', h.x, h.y - h.size / 2 - 16);
   }
 
   // корпус у кольорі свого танка, але під ним завжди зелене кільце «це ти»
@@ -2697,11 +2953,10 @@ function drawHud() {
     }
     ctx.textAlign = 'right';
   }
-  const active = FIELD_MOD_KEYS.filter(k => (player[FIELD_MODS[k].key] || 0) > 0);
-  if (active.length) {
+  if (player.buffs && player.buffs.length) {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffd23f';
-    ctx.fillText(active.map(k => FIELD_MODS[k].hud + Math.ceil(player[FIELD_MODS[k].key] / 1000)).join(' '), W / 2 + 96, midY);
+    ctx.fillText(player.buffs.map(b => CRATES[b.id].ico + Math.ceil(b.left / 1000)).join(' '), W / 2 + 96, midY);
     ctx.textAlign = 'right';
   }
 
@@ -2879,7 +3134,9 @@ function loop(now) {
 
   // ---- ХВИЛІ: кожні 40 с ворог присилає злішу хвилю ----
   battle.waveT += dt;
-  if (battle.waveT >= 40000 && battle.wave < MAX_WAVES) {
+  // поле зачищене — не змушуємо чекати таймер: наступна хвиля йде одразу
+  const fieldClear = spawnQueue.length === 0 && enemies.every(e => e.dead);
+  if ((battle.waveT >= 40000 || (fieldClear && battle.waveT > 2500)) && battle.wave < MAX_WAVES) {
     battle.waveT = 0;
     battle.wave++;
     battle.waveFlash = 2200;
@@ -2904,6 +3161,7 @@ function loop(now) {
   updateModifiers(dt);
   if (state !== 'play') return;
   updateTurrets(dt);
+  updateHelper(dt);
   updatePlayer(dt);
   if (state !== 'play') return; // бій міг закінчитися
   trySpawnEnemy(dt);
@@ -3083,6 +3341,8 @@ function renderTankDetail() {
 
   drawPreview(st);
 
+  renderCodex();
+
   const modBox = document.getElementById('modList');
   modBox.innerHTML = '';
   for (const key of Object.keys(MODULES)) {
@@ -3111,6 +3371,22 @@ function renderTankDetail() {
     }
     modBox.appendChild(row);
   }
+}
+
+// Кодекс: знайдені трофеї відкриваються назавжди — колекція між боями
+function renderCodex() {
+  const box = document.getElementById('codexList');
+  if (!box) return;
+  const found = save.codex || [];
+  document.getElementById('codexCount').textContent = `(${found.length}/${CRATE_KEYS.length} знайдено)`;
+  box.innerHTML = CRATE_KEYS.map(k => {
+    const c = CRATES[k];
+    const has = found.includes(k);
+    return has
+      ? `<div class="cdx found ${c.kind}" title="${c.desc}"><span class="ci">${c.ico}</span>${c.name}</div>`
+      : `<div class="cdx unknown" title="Ще не знайдено">
+           <span class="ci">❔</span>???</div>`;
+  }).join('');
 }
 
 function drawPreview(st) {
@@ -3304,7 +3580,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v23 · 14 скінів, щит штабу, трофеї на карті (вороги теж їх беруть), міцніші стіни';
+const GAME_VERSION = 'v24 · 25 трофейних коробок, помічник 🤝, схованки, кодекс';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

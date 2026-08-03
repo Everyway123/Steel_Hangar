@@ -168,6 +168,15 @@
   #resultTable td { padding: 3px 12px; }
   #resultTable td:last-child { color: var(--gold); text-align: right; }
   #medals { margin-top: 8px; font-size: 14px; color: var(--gold); line-height: 1.7; }
+  #codexList { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cdx {
+    display: flex; align-items: center; gap: 5px; font-size: 11px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+  }
+  .cdx.found.plus { border-color: var(--gold); color: var(--gold); }
+  .cdx.found.tradeoff { border-color: #c07eff; color: #c07eff; }
+  .cdx.unknown { opacity: .35; }
+  .cdx .ci { font-size: 15px; }
 
   /* ======== Сенсорні кнопки ======== */
   #touchPad {
@@ -308,6 +317,10 @@
       <div class="box">
         <h2>🌳 ГІЛКА ДОСЛІДЖЕНЬ</h2>
         <div id="treeList"></div>
+      </div>
+      <div class="box">
+        <h2>🎁 КОДЕКС ТРОФЕЇВ <span style="color:var(--dim);font-size:11px" id="codexCount"></span></h2>
+        <div id="codexList"></div>
       </div>
       <div class="box">
         <h2>📊 АНАЛІТИКА <span style="color:var(--dim);font-size:11px">(рахується автоматично з твоїх боїв)</span></h2>
