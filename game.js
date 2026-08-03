@@ -458,8 +458,16 @@ const CLS_RAMP = { 'ЛТ': 160, 'СТ': 260, 'ВТ': 420, 'ПТ': 300 };
 // ============================================================
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const TILE = 40, COLS = 16, ROWS = 14;
+// Світ удвічі ширший за вікно: камера їде за танком, у HUD — міні-мапа
+const TILE = 40, COLS = 32, ROWS = 14;
+const VIEW_COLS = 16;
 const W = COLS * TILE, H = ROWS * TILE;
+const VIEW_W = VIEW_COLS * TILE;   // ширина полотна = те, що видно
+let camX = 0;
+function updateCamera() {
+  const want = player.x - VIEW_W / 2;
+  camX = Math.max(0, Math.min(W - VIEW_W, want));
+}
 const HUD_TOP = 42, HUD_BOT = 46; // смуги HUD поза ігровим полем
 const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7, T_HEDGE = 8, T_FENCE = 9, T_ICE = 10, T_TURRET = 11, T_HOME = 12;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -662,7 +670,12 @@ function startBattle(sector) {
   spawnPoints = []; enemies = []; bullets = []; particles = []; drops = [];
   for (let r = 0; r < ROWS; r++) {
     grid[r] = []; gridHp[r] = [];
-    const row = (mapDef.map[r] || '').padEnd(COLS, '.');
+    // карта вдвічі ширша: праву половину робимо дзеркальною копією лівої.
+    // Маркери 'P' і 'H' у дзеркалі прибираємо (гравець і штаб мають бути одні),
+    // а спавни 'E' лишаємо — вороги приходять з обох країв
+    const src = (mapDef.map[r] || '').padEnd(VIEW_COLS, '.').slice(0, VIEW_COLS);
+    const mirrored = src.split('').reverse().join('').replace(/[PH]/g, '.');
+    const row = (src + mirrored).padEnd(COLS, '.');
     for (let c = 0; c < COLS; c++) {
       const ch = row[c];
       let t = T_EMPTY, hp = 0;
@@ -677,7 +690,7 @@ function startBattle(sector) {
       else if (ch === 'T') { t = T_TURRET; hp = 10 + 4 * st.tier; }
       else if (ch === 'o') { t = T_BARREL; hp = 1; }
       else if (ch === 'H') { t = T_HQ; hp = 14 + 5 * st.tier; }
-      else if (ch === 'P') { player.x = c * TILE + TILE / 2; player.y = r * TILE + TILE / 2; }
+      else if (ch === 'P') { player.x = COLS * TILE / 2 - TILE / 2; player.y = r * TILE + TILE / 2; }
       else if (ch === 'E') spawnPoints.push({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 });
       grid[r][c] = t; gridHp[r][c] = hp;
     }
@@ -801,7 +814,7 @@ function startBattle(sector) {
   }
 
   // на кожній карті лежать дві кинуті гармати — заїдь і бий двома стволами
-  dropGunEmplacements(2);
+  dropGunEmplacements(4);
 
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
@@ -1027,8 +1040,12 @@ function updateEnemy(e, dt) {
     const homeX = battle.homeC * TILE + TILE / 2, homeY = battle.homeR * TILE + TILE / 2;
     const goHome = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME && Math.random() < 0.45;
     // трофей поруч — ворог звертає за ним: тепер це гонка, а не безкоштовний бонус
-    let loot = null, ld = 260;
-    for (const d of drops) {
+    // за трофеєм біжить лише половина ворогів і лише зблизька:
+    // інакше вони вимітають карту раніше, ніж ти встигаєш доїхати
+    let loot = null, ld = 170;
+    if (e.looter === undefined) e.looter = Math.random() < 0.5;
+    if (e.looter) for (const d of drops) {
+      if (d.kind !== 'crate' && !CRATES[d.kind]) continue;
       const dd = Math.hypot(d.x - e.x, d.y - e.y);
       if (dd < ld) { ld = dd; loot = d; }
     }
@@ -2681,18 +2698,22 @@ function drawTank(t, color, isPlayer) {
 }
 
 function draw() {
+  updateCamera();
   // фон усього полотна (включно зі смугами HUD)
   ctx.fillStyle = '#080c14';
-  ctx.fillRect(0, 0, W, H + HUD_TOP + HUD_BOT);
+  ctx.fillRect(0, 0, VIEW_W, H + HUD_TOP + HUD_BOT);
 
   ctx.save();
-  ctx.translate(0, HUD_TOP); // ігрове поле нижче верхньої панелі
+  ctx.translate(-camX, HUD_TOP); // світ зсувається під камеру
   if (shakeTime > 0) ctx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
   ctx.fillStyle = '#05070c';
-  ctx.fillRect(-10, -10, W + 20, H + 20);
+  ctx.fillRect(camX - 10, -10, VIEW_W + 20, H + 20);
 
+  // малюємо лише те, що в кадрі
+  const c0 = Math.max(0, Math.floor(camX / TILE) - 1);
+  const c1 = Math.min(COLS - 1, Math.ceil((camX + VIEW_W) / TILE) + 1);
   for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++)
+    for (let c = c0; c <= c1; c++)
       if (grid[r][c] !== T_BUSH) drawTile(r, c);
 
   for (const d of drops) {
@@ -2875,6 +2896,76 @@ function draw() {
 
   ctx.restore();
   drawHud(); // поверх усього, без тремтіння екрана
+  drawMinimap();
+}
+
+// Міні-мапа: карта вдвічі ширша за екран, тож потрібен огляд усього поля
+function drawMinimap() {
+  if (!battle || (state !== 'play' && state !== 'perk')) return;
+  const mw = 148, mh = Math.round(mw * H / W), mx = VIEW_W - mw - 8, my = HUD_TOP + 8;
+  const sx = mw / W, sy = mh / H;
+  ctx.save();
+  ctx.globalAlpha = 0.82;
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(mx, my, mw, mh);
+  ctx.strokeStyle = '#263149';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+
+  // стіни — блідими блоками, щоб читалася форма карти
+  ctx.fillStyle = 'rgba(120,140,175,.35)';
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const t = grid[r][c];
+    if (t !== T_BRICK && t !== T_STEEL) continue;
+    ctx.fillRect(mx + c * TILE * sx, my + r * TILE * sy, TILE * sx, TILE * sy);
+  }
+  const dot = (x, y, col, r2) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(mx + x * sx, my + y * sy, r2, 0, 7); ctx.fill(); };
+  // бази
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (grid[r][c] === T_HQ) dot(c * TILE + 20, r * TILE + 20, '#ff4d5e', 3);
+    if (grid[r][c] === T_HOME) dot(c * TILE + 20, r * TILE + 20, '#39ff88', 3);
+  }
+  for (const d of drops) dot(d.x, d.y, CRATES[d.kind] ? '#ffd23f' : '#6fd3ff', 2);
+  for (const e of enemies) if (!e.dead && !(e.spawning > 0)) dot(e.x, e.y, '#ff9d5c', 2.2);
+  if (battle.helper && !battle.helper.dead) dot(battle.helper.x, battle.helper.y, '#6fd3ff', 2.2);
+  dot(player.x, player.y, '#39ff88', 3);
+  // рамка того, що зараз видно на екрані
+  ctx.strokeStyle = 'rgba(57,255,136,.6)';
+  ctx.strokeRect(mx + camX * sx, my, VIEW_W * sx, mh);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // статус під міні-мапою: щит штабу і активні трофеї — тут є місце,
+  // а у верхній смузі вони налазили на таймер
+  // підкладка, щоб текст читався поверх карти
+  const lines = (battle.hqLeft > 0 ? 1 : 0) + ((player.buffs && player.buffs.length) || 0);
+  if (lines) {
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(mx - 40, my + mh + 5, mw + 40, lines * 16 + 6);
+    ctx.restore();
+  }
+  let ly = my + mh + 14;
+  ctx.save();
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 12px monospace';
+  if (battle.hqLeft > 0) {
+    ctx.fillStyle = battle.hqSealed ? '#6fd3ff' : '#ffd23f';
+    ctx.fillText(battle.hqSealed
+      ? `🛡 щит штабу ${Math.min(battle.frags, battle.sealGoal)}/${battle.sealGoal}`
+      : '☭ ШТАБ ВІДКРИТИЙ', mx + mw, ly);
+    ly += 16;
+  }
+  if (player.buffs && player.buffs.length) {
+    ctx.fillStyle = '#ffd23f';
+    for (const b of player.buffs) {
+      ctx.fillText(`${CRATES[b.id].ico} ${CRATES[b.id].name} ${Math.ceil(b.left / 1000)}с`, mx + mw, ly);
+      ly += 15;
+    }
+  }
+  ctx.restore();
 }
 
 // HUD малюється прямо на полі бою — все в одному екрані
@@ -2886,10 +2977,10 @@ function drawHud() {
 
   // ---- верхня панель (над полем) ----
   ctx.fillStyle = '#101725';
-  ctx.fillRect(0, 0, W, HUD_TOP);
+  ctx.fillRect(0, 0, VIEW_W, HUD_TOP);
   ctx.strokeStyle = '#263149';
   ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, HUD_TOP - 0.5); ctx.lineTo(W, HUD_TOP - 0.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, HUD_TOP - 0.5); ctx.lineTo(VIEW_W, HUD_TOP - 0.5); ctx.stroke();
 
   const midY = HUD_TOP / 2;
   ctx.font = 'bold 15px monospace';
@@ -2900,13 +2991,13 @@ function drawHud() {
   ctx.fillStyle = homeFrac < 0.4 ? '#ff4d5e' : '#39ff88';
   const left = `★ ${Math.round(homeFrac * 100)}%   ☭ ${battle.hqLeft}`;
   const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
-  ctx.fillText(`⚔ ${battle.frags}   ${left}${modIco}`, 12, midY);
+  ctx.fillText(`⚔ ${battle.frags}  ${left}${modIco}`, 10, midY);
 
   // взяті доктрини — праворуч від лічильників
   if (battle.perks.length) {
     ctx.font = '15px monospace';
     ctx.fillStyle = '#8fa2c4';
-    ctx.fillText(battle.perks.map(p => p.ico).join('').slice(0, 12), 200, midY);
+    ctx.fillText(battle.perks.map(p => p.ico).join('').slice(0, 8), 190, midY);
   }
 
   // центр: час до кінця бою + таймер постачання
@@ -2917,10 +3008,10 @@ function drawHud() {
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = 'center';
   ctx.fillStyle = leftMs < 30000 ? '#ff4d5e' : '#d7e0f0';
-  ctx.fillText(`⏱ ${mm}:${String(ss).padStart(2, '0')}`, W / 2 - 42, midY);
+  ctx.fillText(`⏱ ${mm}:${String(ss).padStart(2, '0')}`, VIEW_W / 2 - 42, midY);
   // прогрес до наступного постачання (заробляється боєм)
   const pf = Math.min(1, battle.pts / SUPPLY_COST);
-  const bx = W / 2 + 18, bw = 66;
+  const bx = VIEW_W / 2 + 18, bw = 66;
   ctx.fillStyle = '#05070c';
   ctx.fillRect(bx, midY - 6, bw, 12);
   ctx.fillStyle = battle.crateOut ? '#ffd23f' : '#39ff88';
@@ -2936,48 +3027,31 @@ function drawHud() {
   ctx.textAlign = 'left';
   ctx.font = 'bold 13px monospace';
   ctx.fillStyle = battle.waveFlash > 0 ? '#ff4d5e' : '#8fa2c4';
-  ctx.fillText('🌊' + battle.wave, 250, midY);
+  ctx.fillText('🌊 ' + battle.wave, 160, midY);
 
   // праворуч: аптечка
   ctx.textAlign = 'right';
   ctx.fillStyle = battle.medkit ? '#39ff88' : '#3a4661';
-  ctx.fillText(battle.medkit ? (IS_TOUCH ? '🔧 аптечка' : '🔧 аптечка [E]') : '🔧 —', W - 12, midY);
-  if (battle.hqLeft > 0) {
-    ctx.textAlign = 'left';
-    if (battle.hqSealed) {
-      ctx.fillStyle = '#6fd3ff';
-      ctx.fillText(`🛡 щит штабу ${Math.min(battle.frags, battle.sealGoal)}/${battle.sealGoal}`, 250, midY);
-    } else {
-      ctx.fillStyle = '#ffd23f';
-      ctx.fillText('☭ ШТАБ ВІДКРИТИЙ', 250, midY);
-    }
-    ctx.textAlign = 'right';
-  }
-  if (player.buffs && player.buffs.length) {
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ffd23f';
-    ctx.fillText(player.buffs.map(b => CRATES[b.id].ico + Math.ceil(b.left / 1000)).join(' '), W / 2 + 96, midY);
-    ctx.textAlign = 'right';
-  }
+  ctx.fillText(battle.medkit ? (IS_TOUCH ? '🔧 аптечка' : '🔧 аптечка [E]') : '🔧 —', VIEW_W - 12, midY);
 
   // ---- нижня панель: HP (під полем) ----
   ctx.fillStyle = '#101725';
-  ctx.fillRect(0, BOT_Y, W, HUD_BOT);
+  ctx.fillRect(0, BOT_Y, VIEW_W, HUD_BOT);
   ctx.strokeStyle = '#263149';
-  ctx.beginPath(); ctx.moveTo(0, BOT_Y + 0.5); ctx.lineTo(W, BOT_Y + 0.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, BOT_Y + 0.5); ctx.lineTo(VIEW_W, BOT_Y + 0.5); ctx.stroke();
 
   const frac = Math.max(0, player.hp / player.maxHp);
   const barY = BOT_Y + 13, barH = 18;
   ctx.fillStyle = '#05070c';
-  ctx.fillRect(12, barY, W - 24, barH);
+  ctx.fillRect(12, barY, VIEW_W - 24, barH);
   ctx.fillStyle = frac > 0.5 ? '#39ff88' : frac > 0.25 ? '#ffd23f' : '#ff4d5e';
-  ctx.fillRect(12, barY, (W - 24) * frac, barH);
+  ctx.fillRect(12, barY, (VIEW_W - 24) * frac, barH);
   ctx.strokeStyle = '#263149';
-  ctx.strokeRect(12, barY, W - 24, barH);
+  ctx.strokeRect(12, barY, VIEW_W - 24, barH);
   ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'center';
   ctx.fillStyle = frac > 0.35 ? '#05070c' : '#d7e0f0';
-  ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, W / 2, barY + barH / 2);
+  ctx.fillText(`${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp} HP`, VIEW_W / 2, barY + barH / 2);
 
   // ---- ЗАЧИСТКА: коли лишилось ≤3 вороги — вказівники, щоб не шукати їх по карті ----
   if (battle.mode === 'clear' && state === 'play') {
@@ -2985,7 +3059,7 @@ function drawHud() {
     if (alive.length && alive.length + spawnQueue.length <= 3) {
       const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 300);
       for (const e of alive) {
-        const ex = e.x, ey = HUD_TOP + e.y;
+        const ex = e.x - camX, ey = HUD_TOP + e.y;
         ctx.save();
         ctx.strokeStyle = 'rgba(255,210,63,' + (0.3 + pulse * 0.4) + ')';
         ctx.lineWidth = 2;
@@ -2995,9 +3069,9 @@ function drawHud() {
         ctx.restore();
         const d = Math.hypot(e.x - player.x, e.y - player.y);
         if (d > 150) {
-          const ang = Math.atan2(ey - (HUD_TOP + player.y), ex - player.x);
+          const ang = Math.atan2(ey - (HUD_TOP + player.y), ex - (player.x - camX));
           ctx.save();
-          ctx.translate(player.x + Math.cos(ang) * 46, HUD_TOP + player.y + Math.sin(ang) * 46);
+          ctx.translate(player.x - camX + Math.cos(ang) * 46, HUD_TOP + player.y + Math.sin(ang) * 46);
           ctx.rotate(ang);
           ctx.globalAlpha = 0.5 + pulse * 0.4;
           ctx.fillStyle = '#ffd23f';
@@ -3022,8 +3096,8 @@ function drawHud() {
       if (d < bd) { bd = d; hx = x; hy = y; }
     }
     if (hx !== null) {
-      const px = player.x, py = HUD_TOP + player.y;
-      const tx = hx, ty = HUD_TOP + hy;
+      const px = player.x - camX, py = HUD_TOP + player.y;
+      const tx = hx - camX, ty = HUD_TOP + hy;
       const ang = Math.atan2(ty - py, tx - px);
       const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 300);
 
@@ -3062,7 +3136,7 @@ function drawHud() {
     ctx.fillStyle = '#ffd23f';
     ctx.shadowColor = '#ffd23f';
     ctx.shadowBlur = 18;
-    ctx.fillText(`📦 ${sec}`, W / 2, HUD_TOP + 90);
+    ctx.fillText(`📦 ${sec}`, VIEW_W / 2, HUD_TOP + 90);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
@@ -3075,11 +3149,11 @@ function drawHud() {
     ctx.fillStyle = '#ff4d5e';
     ctx.font = 'bold 30px monospace';
     ctx.shadowColor = '#ff4d5e'; ctx.shadowBlur = 18;
-    ctx.fillText('🌊 ХВИЛЯ ' + battle.wave, W / 2, HUD_TOP + 70);
+    ctx.fillText('🌊 ХВИЛЯ ' + battle.wave, VIEW_W / 2, HUD_TOP + 70);
     ctx.shadowBlur = 0;
     ctx.font = '13px monospace';
     ctx.fillStyle = '#d7e0f0';
-    ctx.fillText('вороги міцніші та швидші', W / 2, HUD_TOP + 94);
+    ctx.fillText('вороги міцніші та швидші', VIEW_W / 2, HUD_TOP + 94);
     ctx.globalAlpha = 1;
   }
 
@@ -3089,22 +3163,22 @@ function drawHud() {
     const cy = HUD_TOP + H / 2;
     ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(5,7,12,.78)';
-    ctx.fillRect(0, cy - 58, W, 116);
+    ctx.fillRect(0, cy - 58, VIEW_W, 116);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd23f';
     ctx.font = 'bold 21px monospace';
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 16;
-    ctx.fillText('☭ ЗНИЩ ВОРОЖУ БАЗУ — ЗАХИСТИ СВОЮ ★', W / 2, cy - 16);
+    ctx.fillText('☭ ЗНИЩ ВОРОЖУ БАЗУ — ЗАХИСТИ СВОЮ ★', VIEW_W / 2, cy - 16);
     ctx.shadowBlur = 0;
     ctx.font = '15px monospace';
     ctx.fillStyle = '#d7e0f0';
-    ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ' : ''), W / 2, cy + 16);
+    ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ' : ''), VIEW_W / 2, cy + 16);
     ctx.fillStyle = '#8fa2c4';
     ctx.font = '13px monospace';
     let sub = battle.mode === 'assault' ? 'Підкріплення йдуть — прорвися і знеси ☭ штаб' : '';
     if (battle.mod) sub = (sub ? sub + '  ·  ' : '') + MOD_INFO[battle.mod].ico + ' ' + MOD_INFO[battle.mod].name;
-    if (sub) ctx.fillText(sub, W / 2, cy + 40);
+    if (sub) ctx.fillText(sub, VIEW_W / 2, cy + 40);
     ctx.globalAlpha = 1;
   }
   ctx.restore();
@@ -3580,7 +3654,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v24 · 25 трофейних коробок, помічник 🤝, схованки, кодекс';
+const GAME_VERSION = 'v25 · карта ×2 з камерою і міні-мапою';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
