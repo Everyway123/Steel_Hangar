@@ -385,6 +385,12 @@ function buildRoster(tier, elite) {
 // Прибувають з постачанням раз на ~55 с. Звичайні — чистий бонус,
 // рідкісні — сила за ціну слабкості, епічні — лише в елітних боях.
 const SUPPLY_MS = 45000;              // (лишається як страховка від нульового прогресу)
+// пауза між пострілами всієї ворожої армії: тиск є, але хором не розстрілюють.
+// заміряно тестом enemyfire.js — ціль ~1.3 постр/с на т1 і ~3 постр/с на т4+
+function enemyFireGap() {
+  const tier = battle.tank.tier;
+  return tier <= 2 ? 520 : tier <= 3 ? 400 : 300;
+}
 const SUPPLY_COST = 100;              // бойових очок на одне постачання
 // очки за дії: фраг, урон, шкода ворожій базі — сила заробляється боєм
 const PTS = { frag: 12, dmg: 1, hqDmg: 3, base: 25 };
@@ -1000,7 +1006,7 @@ function updateEnemy(e, dt) {
     const los = dist < range && hasLOS(e.x, e.y, player.x, player.y);
 
     // впритул конус ширший — в упор не промахуються
-    const cone = dist < 120 ? 0.7 : 0.35;
+    const cone = dist < 120 ? 0.8 : 0.5;
 
     // токен вогню: вся ворожа армія стріляє не частіше разу на ~0.5с —
     // тиск є, але п'ятеро не розстрілюють хором (класика екшн-дизайну)
@@ -1012,12 +1018,12 @@ function updateEnemy(e, dt) {
       fireBullet(e, facing, 3.0, e.dmg, false);
       bullets[bullets.length - 1].homing = 'player';
       e.cooldown = e.fireCd + Math.random() * 600;
-      battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+      battle.enemyShotCd = enemyFireGap();
     } else if (los && diff < cone && canFire) {
       e.turretAngle = angP;
       if (e.type === 'boss') bossSpreadShot(e); else shoot(e, false);
       e.cooldown = e.fireCd + Math.random() * 400;
-      battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+      battle.enemyShotCd = enemyFireGap();
     } else if (canFire && grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME &&
                (() => {
                  const hx = battle.homeC * TILE + TILE / 2, hy = battle.homeR * TILE + TILE / 2;
@@ -1033,12 +1039,14 @@ function updateEnemy(e, dt) {
                  e.turretAngle = a;
                  fireBullet(e, a, 3.6, e.dmg, false);
                  e.cooldown = e.fireCd + Math.random() * 300;
-                 battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+                 battle.enemyShotCd = enemyFireGap();
                  return true;
                })()) {
       // постріл по базі гравця вже зроблено
-    } else if (los && dist < 300) {
-      // бачить зблизька — розвертається, але потребує часу на прицілювання
+    } else if (los) {
+      // бачить — розвертається корпусом на гравця по всій дальності огляду.
+      // раніше доводив ствол лише ближче 300px, тож на середній дистанції
+      // вороги просто каталися повз і не стріляли зовсім
       const ddx = player.x - e.x, ddy = player.y - e.y;
       e.wantDir = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 'right' : 'left') : (ddy > 0 ? 'down' : 'up');
       e.dir = e.wantDir;
@@ -1293,7 +1301,7 @@ function updateTurrets(dt) {
       bullets.push({ x: t.x + Math.cos(ang) * 24, y: t.y + Math.sin(ang) * 24, dx: Math.cos(ang), dy: Math.sin(ang), speed: 3.8, dmg: 3, fromPlayer: false });
       sfx.shoot();
       t.cd = 1500 + Math.random() * 500;
-      battle.enemyShotCd = battle.tank.tier <= 2 ? 850 : battle.tank.tier <= 3 ? 650 : 500;
+      battle.enemyShotCd = enemyFireGap();
     }
   }
 }
@@ -1673,6 +1681,9 @@ function updateDrops(dt) {
         battle.crateOut = false;
         pendingPerks++;
         sfx.perk();
+        // ящик треба прибрати ДО виходу з функції: інакше фільтр наприкінці
+        // не виконається, мертвий ящик лишиться в масиві і підбереться знову
+        drops = drops.filter(x => !x.dead);
         openPerkMenu();
         return;
       }
@@ -3051,4 +3062,4 @@ renderHangar();
 requestAnimationFrame(loop);
 
 // хук для автотестів
-window._dbg = { get: () => ({ state, battle, player, enemies, bullets, spawnQueue, save, keys, grid }), killEnemy };
+window._dbg = { get: () => ({ state, battle, player, enemies, bullets, drops, spawnQueue, save, keys, grid }), killEnemy };
