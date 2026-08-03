@@ -171,22 +171,124 @@
 
   /* ======== Сенсорні кнопки ======== */
   #touchPad {
-    display: none; position: fixed; bottom: 10px; left: 0; right: 0;
-    justify-content: space-between; padding: 0 18px; z-index: 10; pointer-events: none;
+    display: none; position: fixed; bottom: 0; left: 0; right: 0;
+    justify-content: space-between; align-items: flex-end;
+    padding: 0 14px 14px; z-index: 10; pointer-events: none;
+    height: 190px;
   }
-  #dpad { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(3, 54px); gap: 4px; pointer-events: auto; }
+  /* аналоговий джойстик — веди пальцем, танк їде туди */
+  #stick {
+    position: relative; width: 152px; height: 152px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, rgba(57,255,136,.10), rgba(18,24,38,.85));
+    border: 2px solid var(--border); pointer-events: auto; touch-action: none;
+  }
+  #stickKnob {
+    position: absolute; left: 50%; top: 50%; width: 62px; height: 62px;
+    margin: -31px 0 0 -31px; border-radius: 50%;
+    background: rgba(57,255,136,.28); border: 2px solid var(--neon);
+    pointer-events: none; transition: background .1s;
+  }
+  #stick.on #stickKnob { background: rgba(57,255,136,.5); }
+  #stickHint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--dim); font-size: 11px; pointer-events: none;
+  }
+  #stick.on #stickHint { opacity: 0; }
   .tbtn {
-    background: rgba(38,49,73,.6); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text); font-size: 22px; display: flex; align-items: center; justify-content: center;
-    touch-action: none;
+    background: rgba(38,49,73,.75); border: 2px solid var(--border); border-radius: 14px;
+    color: var(--text); font-size: 24px; display: flex; align-items: center; justify-content: center;
+    touch-action: none; pointer-events: auto;
   }
-  .tbtn:active { background: rgba(57,255,136,.4); }
+  .tbtn:active { background: rgba(57,255,136,.45); }
+  #rightPad { display: flex; flex-direction: column; gap: 12px; align-items: center; pointer-events: none; }
   #fireBtn {
-    width: 84px; height: 84px; border-radius: 50%;
-    background: rgba(255,77,94,.5); border: 2px solid var(--danger);
-    font-size: 26px; align-self: center; pointer-events: auto; touch-action: none;
+    width: 116px; height: 116px; border-radius: 50%;
+    background: rgba(255,77,94,.42); border: 3px solid var(--danger);
+    font-size: 40px; pointer-events: auto; touch-action: none;
   }
-  @media (pointer: coarse) { body.inBattle #touchPad { display: flex; } }
+  #medBtn { width: 62px; height: 62px; border-radius: 50%; font-size: 26px; }
+  #pauseBtn {
+    position: fixed; top: 8px; right: 10px; z-index: 11; display: none;
+    width: 44px; height: 44px; border-radius: 12px; font-size: 20px;
+    background: rgba(18,24,38,.85); border: 2px solid var(--border); color: var(--text);
+    align-items: center; justify-content: center; pointer-events: auto;
+  }
+  @media (pointer: coarse) {
+    body.inBattle #touchPad { display: flex; }
+    body.inBattle #pauseBtn { display: flex; }
+  }
+
+  /* ======== МОБІЛЬНА ВЕРСІЯ ======== */
+  @media (pointer: coarse), (max-width: 760px) {
+    body { padding: 4px; }
+    /* поле бою займає весь доступний екран над керуванням */
+    /* поле по центру вільного простору над джойстиком, а не притиснуте вгору */
+    #battleView { gap: 0; min-height: calc(100vh - 196px); align-items: center; }
+    #gameBox { width: 100%; }
+    #game {
+      width: 100%;
+      max-height: calc(100vh - 210px);
+      object-fit: contain;
+      border-width: 1px;
+    }
+    #battleHint { display: none; }          /* підказки клавіатури зайві */
+    body.inBattle #hangarFoot { display: none; }
+
+    /* ангар: одна колонка, крупніший текст, великі кнопки */
+    #hangarHead { padding: 10px 12px; }
+    #hangarHead h1 { font-size: 17px; }
+    #hangarHead .res { gap: 10px; font-size: 13px; flex-wrap: wrap; }
+    #hangarMain { flex-direction: column; }
+    #treeCol, #detailCol { flex: 1 1 100%; }
+    /* спершу твій танк і модулі, гілка досліджень — нижче */
+    #detailCol { order: -1; }
+    /* «У БІЙ» завжди під великим пальцем, а не в кінці довгого списку */
+    body:not(.inBattle) { padding-bottom: 88px; }
+    #battleBox { padding: 0; margin: 0; border: 0; background: none; }
+    body:not(.inBattle) #battleBtn {
+      position: fixed; left: 8px; right: 8px; bottom: 8px; width: auto; z-index: 12;
+      background: #0d1420; box-shadow: 0 6px 26px 10px rgba(4,7,13,.95);
+    }
+    .box { padding: 11px; margin-bottom: 9px; }
+    .tankNode { padding: 12px 12px; }        /* палець влучає */
+    .tankNode .tn { font-size: 15px; }
+    .tankNode .badge { font-size: 11px; }
+    .modRow { padding: 11px 10px; font-size: 13px; }
+    .modRow .btn { padding: 9px 12px; font-size: 12px; }
+    .btn { padding: 11px 16px; font-size: 15px; }
+    .btn.small { padding: 8px 12px; font-size: 12px; }
+    #battleBtn { font-size: 22px; padding: 18px; }
+    #tankPreview { width: 150px; height: 92px; }
+
+    /* фронт на телефоні — вертикальний список замість мапи:
+       на 390px сектори налазили один на одного і назви обрізалися */
+    #frontMap {
+      height: auto; overflow: visible; padding: 8px; background-image: none;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    #frontEdges { display: none; }
+    .sector {
+      position: static; transform: none; width: auto; text-align: left; padding: 11px 12px;
+    }
+    .sector.atk:hover, .sector.atk:active { transform: none; }
+    .sector .sn { font-size: 14px; }
+    .sector .sm, .sector .sr { display: inline-block; margin: 2px 10px 0 0; font-size: 11px; }
+    .sector.lock { opacity: .45; padding: 8px 12px; }   /* видно, що попереду, але не відволікає */
+    .sector.lock .sn { font-size: 12px; }
+    #frontHint { font-size: 12px; margin-top: 10px; }
+
+    /* картки доктрин — в один стовпчик і на весь екран */
+    #cards { gap: 8px; }
+    .card { width: 100%; max-width: 290px; padding: 11px 10px; }
+    .card .ico { font-size: 26px; }
+    .card .nm { font-size: 14px; margin: 5px 0 4px; }
+    .card .ds { font-size: 12px; }
+    .overlay { padding: 12px; }
+    .overlay h2 { font-size: 21px; }
+    .overlay p { font-size: 13px; }
+    #resultTable { font-size: 13px; }
+    #resultTable td { padding: 2px 8px; }
+  }
 </style>
 </head>
 <body>
@@ -222,7 +324,7 @@
         <h2>🔧 МОДУЛІ <span style="color:var(--dim);font-size:11px">(покращення купуються за срібло)</span></h2>
         <div id="modList"></div>
       </div>
-      <div class="box">
+      <div class="box" id="battleBox">
         <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
       </div>
     </div>
@@ -284,16 +386,13 @@
 </div>
 
 <div id="touchPad">
-  <div id="dpad">
-    <div></div><div class="tbtn" data-dir="up">▲</div><div></div>
-    <div class="tbtn" data-dir="left">◀</div><div></div><div class="tbtn" data-dir="right">▶</div>
-    <div></div><div class="tbtn" data-dir="down">▼</div><div></div>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:8px;align-self:center;pointer-events:auto">
-    <div class="tbtn" id="medBtn" style="width:54px;height:54px;border-radius:50%">🔧</div>
+  <div id="stick"><div id="stickKnob"></div><div id="stickHint">рух</div></div>
+  <div id="rightPad">
+    <div class="tbtn" id="medBtn">🔧</div>
     <div class="tbtn" id="fireBtn">💥</div>
   </div>
 </div>
+<div class="tbtn" id="pauseBtn">⏸</div>
 
 <script src="game.js"></script>
 </body>

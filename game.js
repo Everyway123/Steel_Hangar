@@ -434,7 +434,9 @@ const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 let grid, gridHp, player, enemies, bullets, particles, drops;
-let touchMode = false; // на тачі стрілок нема — там лишається автоприціл
+// телефон/планшет визначаємо одразу: без підказок клавіш у HUD і з автоприцілом з першого пострілу
+const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+let touchMode = IS_TOUCH; // на тачі точного керування нема — там лишається автоприціл
 let spawnQueue, spawnPoints, spawnTimer, maxAlive;
 let battle; // статистика поточного бою
 let state = 'hangar';
@@ -673,6 +675,23 @@ function startBattle(sector) {
       }
     }
   };
+  // страховка: під гравцем ніколи не має бути стіни, і має бути куди виїхати
+  const PASSABLE = [T_EMPTY, T_BUSH, T_SAND, T_ICE];
+  const freePlayerSpot = () => {
+    const r = Math.floor(player.y / TILE), c = Math.floor(player.x / TILE);
+    if (!grid[r] || grid[r][c] === undefined) return;
+    if (!PASSABLE.includes(grid[r][c])) { grid[r][c] = T_EMPTY; gridHp[r][c] = 0; }
+    const around = [[-1, 0], [0, -1], [0, 1], [1, 0]]
+      .map(([dr, dc]) => [r + dr, c + dc])
+      .filter(([rr, cc]) => rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS);
+    let open = around.filter(([rr, cc]) => PASSABLE.includes(grid[rr][cc])).length;
+    for (const [rr, cc] of around) {
+      if (open >= 2) break;
+      if (grid[rr][cc] === T_HOME || grid[rr][cc] === T_HQ || grid[rr][cc] === T_STEEL) continue;
+      if (PASSABLE.includes(grid[rr][cc])) continue;
+      grid[rr][cc] = T_EMPTY; gridHp[rr][cc] = 0; open++;
+    }
+  };
 
   const baseHp = 12 + 4 * st.tier;
   // ворожа база — вгорі по центру (якщо карта не має власних штабів)
@@ -680,11 +699,16 @@ function startBattle(sector) {
     putBase(1, Math.floor(COLS / 2) - 1, T_HQ, baseHp, 'down'); // підхід знизу відкритий
     battle.hqLeft = 1;
   }
-  // твоя база — під спавном гравця
-  const pr = Math.min(ROWS - 1, Math.floor(player.y / TILE) + 1);
+  // твоя база — ПІД спавном гравця, ніколи не на ньому:
+  // якщо 'P' стоїть на нижньому ряду, підіймаємо танк на клітинку вище,
+  // інакше база лягає просто під гусениці й танк замурований з першої секунди
+  let prow = Math.floor(player.y / TILE);
+  if (prow >= ROWS - 1) { prow = ROWS - 2; player.y = prow * TILE + TILE / 2; }
+  const pr = prow + 1;
   const pc = Math.floor(player.x / TILE);
   putBase(pr, pc, T_HOME, baseHp, 'up'); // гравець заїжджає згори
   clearSpawns();
+  freePlayerSpot();
   battle.homeHp = baseHp; battle.homeMax = baseHp;
   battle.homeR = pr; battle.homeC = pc;
 
@@ -2414,7 +2438,7 @@ function drawHud() {
   // праворуч: аптечка
   ctx.textAlign = 'right';
   ctx.fillStyle = battle.medkit ? '#39ff88' : '#3a4661';
-  ctx.fillText(battle.medkit ? '🔧 аптечка [E]' : '🔧 —', W - 12, midY);
+  ctx.fillText(battle.medkit ? (IS_TOUCH ? '🔧 аптечка' : '🔧 аптечка [E]') : '🔧 —', W - 12, midY);
 
   // ---- нижня панель: HP (під полем) ----
   ctx.fillStyle = '#101725';
@@ -2939,24 +2963,80 @@ document.getElementById('resetBtn').onclick = () => {
   }
 };
 
-// сенсорне керування
-for (const btn of document.querySelectorAll('#dpad .tbtn')) {
-  const dir = btn.dataset.dir;
-  if (!dir) continue;
-  btn.addEventListener('touchstart', e => { e.preventDefault(); keys[dir] = true; }, { passive: false });
-  btn.addEventListener('touchend', e => { e.preventDefault(); keys[dir] = false; }, { passive: false });
+// ---------- СЕНСОРНЕ КЕРУВАННЯ: аналоговий джойстик ----------
+const stick = document.getElementById('stick');
+const knob = document.getElementById('stickKnob');
+let stickId = null, stickCx = 0, stickCy = 0;
+const STICK_R = 52; // радіус ходу ручки
+
+function clearMoveKeys() { keys.up = keys.down = keys.left = keys.right = false; }
+
+function setStick(px, py) {
+  let dx = px - stickCx, dy = py - stickCy;
+  const d = Math.hypot(dx, dy);
+  const max = STICK_R;
+  if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  clearMoveKeys();
+  if (d < 14) return; // мертва зона — стоїмо
+  // напрямок за домінантною віссю (танк їздить по 4 напрямках)
+  if (Math.abs(dx) > Math.abs(dy)) keys[dx > 0 ? 'right' : 'left'] = true;
+  else keys[dy > 0 ? 'down' : 'up'] = true;
 }
+
+function stickStart(e) {
+  const t = e.changedTouches[0];
+  stickId = t.identifier;
+  const r = stick.getBoundingClientRect();
+  stickCx = r.left + r.width / 2;
+  stickCy = r.top + r.height / 2;
+  stick.classList.add('on');
+  touchMode = true;
+  setStick(t.clientX, t.clientY);
+  e.preventDefault();
+}
+function stickMove(e) {
+  if (stickId === null) return;
+  for (const t of e.changedTouches) {
+    if (t.identifier !== stickId) continue;
+    setStick(t.clientX, t.clientY);
+    e.preventDefault();
+  }
+}
+function stickEnd(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier !== stickId) continue;
+    stickId = null;
+    stick.classList.remove('on');
+    knob.style.transform = '';
+    clearMoveKeys();
+    e.preventDefault();
+  }
+}
+stick.addEventListener('touchstart', stickStart, { passive: false });
+stick.addEventListener('touchmove', stickMove, { passive: false });
+stick.addEventListener('touchend', stickEnd, { passive: false });
+stick.addEventListener('touchcancel', stickEnd, { passive: false });
+
 const fireBtn = document.getElementById('fireBtn');
 fireBtn.addEventListener('touchstart', e => { e.preventDefault(); keys.fire = true; touchMode = true; }, { passive: false });
 fireBtn.addEventListener('touchend', e => { e.preventDefault(); keys.fire = false; }, { passive: false });
+fireBtn.addEventListener('touchcancel', e => { keys.fire = false; }, { passive: false });
 document.getElementById('medBtn').addEventListener('touchstart', e => { e.preventDefault(); useMedkit(); }, { passive: false });
+document.getElementById('pauseBtn').addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (state === 'play') pauseGame(); else if (state === 'pause') resumeGame();
+}, { passive: false });
+
+// на тачі картки доктрин і кнопки оверлеїв мають реагувати на дотик одразу
+document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v18 · зароблені доктрини · хвилі · фікс застрягань';
+const GAME_VERSION = 'v20 · фікс: танк більше не замурований у власній базі + мобільна версія';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
 requestAnimationFrame(loop);
 
 // хук для автотестів
-window._dbg = { get: () => ({ state, battle, player, enemies, spawnQueue, save }), killEnemy };
+window._dbg = { get: () => ({ state, battle, player, enemies, bullets, spawnQueue, save, keys, grid }), killEnemy };
