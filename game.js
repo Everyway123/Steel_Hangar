@@ -395,6 +395,7 @@ const SUPPLY_COST = 100;              // бойових очок на одне �
 // очки за дії: фраг, урон, шкода ворожій базі — сила заробляється боєм
 const PTS = { frag: 12, dmg: 1, hqDmg: 3, base: 25 };
 const BATTLE_LIMIT_MS = 120000; // 2 хвилини — жорстка межа раунду
+const MAX_WAVES = 3;            // дві хвилі підкріплень за бій, далі ростер скінченний
 const PERKS = [
   // польові — прості, але відчутні
   { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+60% срібла за кожен фраг до кінця бою',
@@ -727,6 +728,7 @@ function startBattle(sector) {
   putBase(pr, pc, T_HOME, baseHp, 'up'); // гравець заїжджає згори
   clearSpawns();
   freePlayerSpot();
+  player.barrelT = 0;
   battle.homeHp = baseHp; battle.homeMax = baseHp;
   battle.homeR = pr; battle.homeC = pc;
 
@@ -749,9 +751,12 @@ function startBattle(sector) {
     }
   }
 
+  // на кожній карті лежать дві кинуті гармати — заїдь і бий двома стволами
+  dropGunEmplacements(2);
+
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
-  maxAlive = Math.min(6, 4 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
+  maxAlive = Math.min(8, 5 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -900,7 +905,8 @@ function fireBullet(tank, ang, speed, dmg, fromPlayer, overWalls) {
 
 function shoot(tank, isPlayer) {
   if (isPlayer) {
-    const angles = player.doubleShot
+    const twin = player.doubleShot || (player.barrelT || 0) > 0;
+    const angles = twin
       ? [player.turretAngle - 0.07, player.turretAngle + 0.07]
       : [player.turretAngle];
     for (const a of angles) {
@@ -1382,8 +1388,9 @@ function endBattle(victory) {
 
   // звільнення сектора фронту
   let sectorMsg = '';
-  if (victory && battle.sector) {
-    const sec = sectorById(battle.sector);
+  const sec0 = battle.sector ? sectorById(battle.sector) : null;
+  if (victory && sec0) {
+    const sec = sec0;
     if (!save.front.liberated.includes(battle.sector)) {
       save.front.liberated.push(battle.sector);
       save.credits += sec.reward;
@@ -1632,6 +1639,38 @@ function updateModifiers(dt) {
 }
 
 // ---------- Ящик постачання: за нього треба доїхати під вогнем ----------
+// кинута гармата: заїдь на неї — і 25 с стріляєш ДВОМА стволами
+function dropGunEmplacements(n) {
+  for (let i = 0; i < n; i++) {
+    const spot = findOpenSpot(150, 520);
+    if (spot) drops.push({ x: spot.x, y: spot.y, kind: 'gun', ttl: BATTLE_LIMIT_MS });
+  }
+}
+
+// вільна клітина не в глухому куті і на цікавій відстані від гравця
+function findOpenSpot(minD, maxD) {
+  let best = null, bestScore = -1;
+  for (let i = 0; i < 60; i++) {
+    const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+    const c = Math.floor(Math.random() * COLS);
+    if (grid[r][c] !== T_EMPTY && grid[r][c] !== T_SAND && grid[r][c] !== T_ICE) continue;
+    let open = 0;
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+      const t = grid[rr][cc];
+      if (t === T_EMPTY || t === T_SAND || t === T_ICE || t === T_BUSH) open++;
+    }
+    if (open < 2) continue;
+    const x = c * TILE + TILE / 2, y = r * TILE + TILE / 2;
+    if (drops.some(d => Math.hypot(d.x - x, d.y - y) < 90)) continue;
+    const d = Math.hypot(x - player.x, y - player.y);
+    const score = d > minD && d < maxD ? d : -1;
+    if (score > bestScore) { bestScore = score; best = { x, y }; }
+  }
+  return best;
+}
+
 function dropSupplyCrate() {
   let best = null, bestScore = -1;
   for (let i = 0; i < 60; i++) {
@@ -1683,6 +1722,10 @@ function updateDrops(dt) {
       if (d.kind === 'med') { player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.3)); floatText(d.x, d.y, '+HP', '#ff8c69'); }
       else if (d.kind === 'star') { battle.credits += 120; floatText(d.x, d.y, '+120 🪙', '#ffd23f'); }
       else if (d.kind === 'freeze') { freezeTimer = 4000; floatText(d.x, d.y, 'ЗАМОРОЗКА!', '#6fd3ff'); }
+      else if (d.kind === 'gun') {
+        player.barrelT = Math.max(player.barrelT || 0, 25000);
+        floatText(d.x, d.y, '🔫 ДРУГИЙ СТВОЛ! 25 с', '#ffd23f');
+      }
       else if (d.kind === 'crate') {
         battle.crateOut = false;
         pendingPerks++;
@@ -1723,6 +1766,7 @@ function updateParticles(dt) {
 // ---------- Гравець ----------
 function updatePlayer(dt) {
   if (player.invuln > 0) player.invuln -= dt;
+  if (player.barrelT > 0) player.barrelT -= dt;
   if (player.flash > 0) player.flash -= dt;
   player.cooldown -= dt;
   let dir = null;
@@ -1789,16 +1833,21 @@ function updatePlayer(dt) {
 function coneAssist(base) {
   let best = base, bestDiff = 0.35;
   const maxDist = battle.mod === 'fog' ? 300 : 500;
-  const consider = (x, y) => {
-    if (Math.hypot(x - player.x, y - player.y) > maxDist) return;
+  const consider = (x, y, size) => {
+    const d = Math.hypot(x - player.x, y - player.y);
+    if (d > maxDist) return;
     const ang = Math.atan2(y - player.y, x - player.x);
     const diff = Math.abs(((ang - base + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-    if (diff < bestDiff && hasLOS(player.x, player.y, x, y)) { bestDiff = diff; best = ang; }
+    // впритул конус у 20° — це лише 12 px убік, а корпуси торкаються аж до 33 px:
+    // ворог, у який ти впираєшся бортом, має бути в межах доводки
+    const halfW = (player.size + (size || 34)) / 2;
+    const limit = d > 1 ? Math.max(bestDiff, Math.min(0.9, Math.asin(Math.min(1, halfW / d)))) : bestDiff;
+    if (diff < limit && diff < bestDiff + 0.55 && hasLOS(player.x, player.y, x, y)) { bestDiff = Math.min(bestDiff, diff); best = ang; }
   };
-  for (const e of enemies) if (!e.dead && !(e.spawning > 0)) consider(e.x, e.y);
+  for (const e of enemies) if (!e.dead && !(e.spawning > 0)) consider(e.x, e.y, e.size);
   if (battle.mode === 'assault') {
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
-      if (grid[r][c] === T_HQ) consider(c * TILE + TILE / 2, r * TILE + TILE / 2);
+      if (grid[r][c] === T_HQ) consider(c * TILE + TILE / 2, r * TILE + TILE / 2, TILE);
   }
   return best;
 }
@@ -2271,7 +2320,15 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(d.x, d.y, 20 + pl * 5, 0, 7); ctx.stroke();
     } else {
-      ctx.fillText(d.kind === 'med' ? '💊' : d.kind === 'star' ? '⭐' : '❄️', d.x, d.y);
+      if (d.kind === 'gun') {
+        const pg = 0.6 + Math.sin(performance.now() / 300) * 0.4;
+        ctx.save();
+        ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 12 * pg;
+        ctx.fillText('🔫', d.x, d.y);
+        ctx.restore();
+      } else {
+        ctx.fillText(d.kind === 'med' ? '💊' : d.kind === 'star' ? '⭐' : '❄️', d.x, d.y);
+      }
     }
   }
 
@@ -2468,6 +2525,12 @@ function drawHud() {
   ctx.textAlign = 'right';
   ctx.fillStyle = battle.medkit ? '#39ff88' : '#3a4661';
   ctx.fillText(battle.medkit ? (IS_TOUCH ? '🔧 аптечка' : '🔧 аптечка [E]') : '🔧 —', W - 12, midY);
+  if ((player.barrelT || 0) > 0) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText('🔫 ' + Math.ceil(player.barrelT / 1000) + ' с', W / 2 + 150, midY);
+    ctx.textAlign = 'right';
+  }
 
   // ---- нижня панель: HP (під полем) ----
   ctx.fillStyle = '#101725';
@@ -2643,13 +2706,18 @@ function loop(now) {
 
   // ---- ХВИЛІ: кожні 40 с ворог присилає злішу хвилю ----
   battle.waveT += dt;
-  if (battle.waveT >= 40000) {
+  if (battle.waveT >= 40000 && battle.wave < MAX_WAVES) {
     battle.waveT = 0;
     battle.wave++;
     battle.waveFlash = 2200;
+    // хвиля має ПРИВОДИТИ ворогів. Раніше лічильник крутився вхолосту:
+    // напис «ХВИЛЯ 3» був, а підкріплення не приходило зовсім
+    const reinf = buildRoster(battle.tank.tier, false).slice(0, 3 + battle.tank.tier);
+    spawnQueue.push(...reinf);
+    battle.totalEnemies += reinf.length;
     sfx.boom();
     shakeTime = 250;
-    floatText(player.x, player.y - 46, '⚠ ХВИЛЯ ' + battle.wave + '!', '#ff4d5e');
+    floatText(player.x, player.y - 46, `⚠ ХВИЛЯ ${battle.wave}: +${reinf.length} ворогів!`, '#ff4d5e');
   }
   if (battle.waveFlash > 0) battle.waveFlash -= dt;
 
@@ -2913,7 +2981,8 @@ const KEYMAP = {
 
 function pauseGame() {
   state = 'pause';
-  keys = {};
+  // keys НЕ скидаємо: якщо гравець тримає Пробіл, після паузи новий keydown
+  // не прийде і пушка мовчатиме, доки не відпустити й натиснути знову
   document.getElementById('pauseOverlay').classList.remove('hidden');
 }
 function resumeGame() {
@@ -3061,11 +3130,12 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v21 · фікси: рух танка, ящик постачання, вороги стріляють';
+const GAME_VERSION = 'v22 · хвилі приводять підкріплення, влучання впритул, кинуті гармати 🔫';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
 requestAnimationFrame(loop);
 
 // хук для автотестів
+window.addEventListener('blur', () => { keys = {}; });
 window._dbg = { get: () => ({ state, battle, player, enemies, bullets, drops, spawnQueue, save, keys, grid }), killEnemy };
