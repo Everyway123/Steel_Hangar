@@ -61,17 +61,8 @@
 
 ---
 
-## 🧀 Друга гра в репо: SCUDERIA MOZARELLA
+## 🧀 Сусідній проєкт: SCUDERIA MOZARELLA
 
-У папці [`scuderia-mozarella/`](scuderia-mozarella/) живе окремий проєкт — F1-менеджер
-із сезоном 2026, регулятором довжини гонки (25 / 50 / 100% дистанції) і broadcast-виглядом
-як у F1 TV. Vite + TypeScript, симуляція відокремлена від рендеру й покрита тестами.
-
-Зараз там готовий движок гонки (M1):
-`cd scuderia-mozarella && npm install && npm run race`.
-Деталі моделі й калібрування — у [scuderia-mozarella/README.md](scuderia-mozarella/README.md).
-
-> Ця папка тимчасова: гра переїжджає у власний репозиторій
-> [Everyway123/scuderia-mozarella](https://github.com/Everyway123/scuderia-mozarella).
-
-«Сталевий Ангар» цим не зачеплений.
+F1-менеджер із сезоном 2026 живе в окремому репозиторії —
+[Everyway123/scuderia-mozarella](https://github.com/Everyway123/scuderia-mozarella).
+Vite + TypeScript, симуляція гонки відокремлена від рендеру й покрита тестами.
