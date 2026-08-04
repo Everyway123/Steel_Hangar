@@ -822,7 +822,9 @@ function startBattle(sector) {
   battle.totalEnemies = spawnQueue.length;
   // штаб ☭ під сталевим щитом, доки не виб'єш половину передового загону.
   // Раунд тепер має дві фази: бій за перевагу → прорив до штабу
-  battle.sealGoal = Math.ceil(spawnQueue.length / 2);
+  // у зачистці штаб — бонусний швидкий шлях, тож гейт half. У штурмі штаб
+  // САМ є ціллю: гейт half перетворював штурм на «зачистка, потім штурм»
+  battle.sealGoal = Math.ceil(spawnQueue.length / (battle.mode === 'assault' ? 3 : 2));
   battle.hqSealed = true;
   maxAlive = Math.min(8, 5 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
