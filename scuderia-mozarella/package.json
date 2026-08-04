@@ -1,9 +1,9 @@
 {
-  "name": "pitwall-2026",
+  "name": "scuderia-mozarella",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ПІТВОЛ 2026 — F1-менеджер у браузері",
+  "description": "SCUDERIA MOZARELLA — F1-менеджер у браузері, сезон 2026",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
