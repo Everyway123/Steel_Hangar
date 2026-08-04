@@ -651,7 +651,7 @@ function startBattle(sector) {
     mines: [], strikes: [], artT: 3000,
     frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0,
-    supply: 0, pts: 0, ptsTotal: 0, wave: 1, waveT: 0, medkit: true, idle: 0, farmWarned: false, arcWarned: false, reinforce: 14,
+    supply: 0, pts: 0, ptsTotal: 0, wave: 1, waveT: 0, medkit: true, idle: 0, farmWarned: false, arcWarned: false, reinforce: 5,
     gameMs: 0, dmgTaken: 0,
     perks: [],
     tierMult: 1 + 0.3 * (st.tier - 1),
@@ -1007,6 +1007,8 @@ function bossSpreadShot(boss) {
 // ---------- Спавн і AI ----------
 function trySpawnEnemy(dt) {
   // у штурмі є підкріплення, але вони скінченні (щоб бій не тягнувся вічно)
+  // у штурмі підкріплення накладались на нові хвилі: ростер + 2 хвилі + 14
+  // підкріплень = під 30 ворогів за 2 хвилини. Тепер підкріплень 5
   if (battle.mode === 'assault' && !spawnQueue.length && battle.reinforce > 0) {
     battle.reinforce--;
     const tier = battle.tank.tier;
