@@ -1512,7 +1512,9 @@ function endBattle(victory) {
   state = 'results';
 
   const mult = battle.tierMult * (battle.elite ? 1.7 : 1);
-  const winBonus = victory ? Math.round((battle.mode === 'assault' ? 350 : 250) * battle.tank.tier) : 0;
+  // штурм заміряно вдвічі важчим за зачистку (7/24 проти 15/24 перемог,
+  // 14 смертей проти 6) — нагорода має відповідати ціні входу
+  const winBonus = victory ? Math.round((battle.mode === 'assault' ? 520 : 250) * battle.tank.tier) : 0;
   const creditsEarned = Math.round((battle.credits * mult + winBonus) * (1 + (battle.tank.radioBonus || 0) + frontBonus()));
 
   // звільнення сектора фронту
@@ -3661,7 +3663,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v25 · карта ×2 з камерою і міні-мапою';
+const GAME_VERSION = 'v26 · баланс штурму за даними повного прогону';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
