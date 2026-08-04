@@ -712,7 +712,9 @@ function startBattle(sector) {
       if (openSide === 'down' && dr === 1) continue;   // прохід знизу
       if (openSide === 'up' && dr === -1) continue;    // прохід згори
       if (grid[rr][cc] === T_EMPTY || grid[rr][cc] === T_SAND || grid[rr][cc] === T_ICE) {
-        grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 6;
+        // мур навколо бази — тонший за звичайну цеглу: його призначення
+        // пробивати, а не тримати. З 6 HP штурм ставав непрохідним
+        grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 3;
       }
     }
   };
