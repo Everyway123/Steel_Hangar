@@ -13,34 +13,34 @@ const TANKS = {
   kadet:    { name: 'Т-10 «Кадет»',      cls: 'ЛТ', tier: 1, hp: 12, dmg: 2,  fireCd: 550,  speed: 1.75,  armor: 0, bulletSpeed: 6.0,  size: 32,
               prev: null,       research: 0,     cost: 0,     desc: 'Навчальний танк. З нього починається кожен герой.' },
   sokil:    { name: 'Т-25 «Сокіл»',      cls: 'ЛТ', tier: 2, hp: 15, dmg: 2,  fireCd: 420,  speed: 2.2,  armor: 0, bulletSpeed: 7.0,  size: 32,
-              prev: 'kadet',    research: 250,   cost: 600,   desc: 'Швидкий розвідник. Літає по карті, жалить і тікає.' },
+              prev: 'kadet',    research: 400,   cost: 600,   desc: 'Швидкий розвідник. Літає по карті, жалить і тікає.' },
   pryvyd:   { name: 'Т-50 «Привид»',     cls: 'ЛТ', tier: 3, hp: 18, dmg: 3,  fireCd: 380,  speed: 2.45,  armor: 0, bulletSpeed: 7.5,  size: 32,
-              prev: 'sokil',    research: 700,   cost: 2000,  desc: 'Найшвидший танк гри. Вороги бачать лише пил.' },
+              prev: 'sokil',    research: 1100,  cost: 2000,  desc: 'Найшвидший танк гри. Вороги бачать лише пил.' },
   // Універсали (СТ)
   veteran:  { name: 'Т-34 «Ветеран»',    cls: 'СТ', tier: 3, hp: 22, dmg: 3,  fireCd: 500,  speed: 1.7,  armor: 1, bulletSpeed: 7.0,  size: 34,
-              prev: 'sokil',    research: 600,   cost: 1800,  desc: 'Легендарний універсал. Надійний у будь-якій ситуації.' },
+              prev: 'sokil',    research: 1000,  cost: 1800,  desc: 'Легендарний універсал. Надійний у будь-якій ситуації.' },
   bars:     { name: 'Т-44 «Барс»',       cls: 'СТ', tier: 4, hp: 28, dmg: 4,  fireCd: 480,  speed: 2.0,  armor: 1, bulletSpeed: 7.5,  size: 35,
-              prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Швидкий, точний, злий. Танк для тих, хто все вміє.' },
+              prev: 'veteran',  research: 2600,  cost: 4500,  desc: 'Швидкий, точний, злий. Танк для тих, хто все вміє.' },
   shkval:   { name: 'Т-62 «Шквал»',      cls: 'СТ', tier: 5, hp: 36, dmg: 5,  fireCd: 460,  speed: 1.85,  armor: 2, bulletSpeed: 8.0,  size: 36,
-              prev: 'bars',     research: 3000,  cost: 10000, desc: 'Вершина СТ: тисне темпом і не пробачає помилок.' },
+              prev: 'bars',     research: 5000,  cost: 9000, desc: 'Вершина СТ: тисне темпом і не пробачає помилок.' },
   // Гілка важких (ВТ)
   bastion:  { name: 'КВ-1 «Бастіон»',    cls: 'ВТ', tier: 4, hp: 34, dmg: 4,  fireCd: 620,  speed: 1.2, armor: 2, bulletSpeed: 7.0,  size: 38,
-              prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Важка броня. Снаряди рикошетять, вороги плачуть.' },
+              prev: 'veteran',  research: 2600,  cost: 4500,  desc: 'Важка броня. Снаряди рикошетять, вороги плачуть.' },
   molot:    { name: 'ІС-7 «Молот»',      cls: 'ВТ', tier: 5, hp: 48, dmg: 5,  fireCd: 660,  speed: 1.1, armor: 3, bulletSpeed: 7.5,  size: 40,
-              prev: 'bastion',  research: 3000,  cost: 10000, desc: 'Сталева фортеця на гусеницях. Але це ще не вершина...' },
+              prev: 'bastion',  research: 5000,  cost: 9000, desc: 'Сталева фортеця на гусеницях. Але це ще не вершина...' },
   mamont:   { name: 'КВ-5 «Мамонт»',     cls: 'ВТ', tier: 6, hp: 68, dmg: 6,  fireCd: 700,  speed: 1.0, armor: 4, bulletSpeed: 7.5,  size: 42,
-              prev: 'molot',    research: 6500,  cost: 24000, desc: 'Ходяча стіна. Половина снарядів просто відскакує.' },
+              prev: 'molot',    research: 8500,  cost: 16000, desc: 'Ходяча стіна. Половина снарядів просто відскакує.' },
   tytan:    { name: 'Об.705 «Титан»',    cls: 'ВТ', tier: 7, hp: 92, dmg: 7,  fireCd: 750,  speed: 0.95, armor: 5, bulletSpeed: 8.0,  size: 44,
-              prev: 'mamont',   research: 13000, cost: 50000, desc: 'Абсолютна вершина. Земля дрижить, вороги розбігаються.' },
+              prev: 'mamont',   research: 15000, cost: 30000, desc: 'Абсолютна вершина. Земля дрижить, вороги розбігаються.' },
   // Снайпери (ПТ-САУ)
   osa:      { name: 'СУ-85 «Оса»',       cls: 'ПТ', tier: 4, hp: 18, dmg: 6,  fireCd: 850,  speed: 1.45, armor: 0, bulletSpeed: 9.0,  size: 34,
-              prev: 'veteran',  research: 1400,  cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
+              prev: 'veteran',  research: 2600,  cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
   kobra:    { name: 'ІСУ-152 «Кобра»',   cls: 'ПТ', tier: 5, hp: 24, dmg: 9,  fireCd: 980,  speed: 1.3,  armor: 1, bulletSpeed: 10.0, size: 36,
-              prev: 'osa',      research: 3000,  cost: 10000, desc: '«Бах» — і ворога більше немає.' },
+              prev: 'osa',      research: 5000,  cost: 9000, desc: '«Бах» — і ворога більше немає.' },
   skorpion: { name: 'СУ-100 «Скорпіон»', cls: 'ПТ', tier: 6, hp: 30, dmg: 12, fireCd: 1050, speed: 1.3, armor: 1, bulletSpeed: 10.5, size: 38,
-              prev: 'kobra',    research: 6500,  cost: 24000, desc: 'Жало, що пробиває все. Навіть важкі бояться.' },
+              prev: 'kobra',    research: 8500,  cost: 16000, desc: 'Жало, що пробиває все. Навіть важкі бояться.' },
   aspid:    { name: 'Об.268 «Аспід»',    cls: 'ПТ', tier: 7, hp: 38, dmg: 16, fireCd: 1150, speed: 1.2, armor: 2, bulletSpeed: 11.0, size: 40,
-              prev: 'skorpion', research: 13000, cost: 50000, desc: 'Один постріл — один труп. Навіть боси здригаються.' },
+              prev: 'skorpion', research: 15000, cost: 30000, desc: 'Один постріл — один труп. Навіть боси здригаються.' },
 };
 const TREE_ORDER = ['kadet', 'sokil', 'pryvyd', 'veteran', 'bars', 'shkval',
   'bastion', 'molot', 'mamont', 'tytan', 'osa', 'kobra', 'skorpion', 'aspid'];
@@ -393,7 +393,8 @@ const ENEMY_TYPES = {
 
 function buildRoster(tier, elite) {
   const pool = [];
-  const count = 7 + tier;
+  // карта вдвічі ширша за стару — на ній 7+tier ворогів губилися
+  const count = 10 + tier;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -855,7 +856,7 @@ function startBattle(sector) {
   clearSpawns();
   freePlayerSpot();
   player.buffs = []; player.fragile = 1;
-  battle.helper = null;
+  battle.helpers = [];
   battle.homeHp = baseHp; battle.homeMax = baseHp;
   battle.homeR = pr; battle.homeC = pc;
 
@@ -914,7 +915,7 @@ function startBattle(sector) {
   // провокує кидатись на нього крізь вогонь
   battle.sealGoal = Math.ceil(spawnQueue.length / 2);
   battle.hqSealed = true;
-  maxAlive = Math.min(8, 5 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
+  maxAlive = Math.min(12, 7 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -1405,20 +1406,8 @@ function updateBullets(dt) {
           break;
         }
       }
-    } else if (battle.helper && !battle.helper.dead &&
-               Math.abs(b.x - battle.helper.x) < battle.helper.size / 2 &&
-               Math.abs(b.y - battle.helper.y) < battle.helper.size / 2) {
-      b.dead = true;
-      battle.helper.hp -= b.dmg;
-      battle.helper.flash = 90;
-      sfx.hit();
-      spawnParticles(b.x, b.y, '#6fd3ff', 5);
-      if (battle.helper.hp <= 0) {
-        battle.helper.dead = true;
-        spawnParticles(battle.helper.x, battle.helper.y, '#6fd3ff', 22);
-        floatText(battle.helper.x, battle.helper.y - 22, '🤝 помічника знищено', '#ff4d5e');
-        sfx.boom();
-      }
+    } else if (hitHelper(b)) {
+      // влучання в помічника оброблено всередині
     } else if (player.invuln <= 0 &&
                Math.abs(b.x - player.x) < player.size / 2 &&
                Math.abs(b.y - player.y) < player.size / 2) {
@@ -1622,11 +1611,14 @@ function endBattle(victory) {
       sectorMsg = `🏆 ЦИТАДЕЛЬ ВПАЛА! ФРОНТ ${save.front.level - 1} ПРОРВАНО!<br>Відкрито Фронт ${save.front.level} — вороги значно зліші, нагороди більші.`;
     }
   }
-  const xpEarned = Math.round((battle.xp + (victory ? 60 * battle.tank.tier : 0)) * mult);
+  // досвід рухався надто повільно: бонус за перемогу подвоєно, а звільнений
+  // сектор додає ще половину — тепер кампанія живить дерево, а не конкурує з ним
+  const sectorXp = (victory && sec0 && !save.front.liberated.slice(0, -1).includes(battle.sector)) ? 0.5 : 0;
+  const xpEarned = Math.round((battle.xp + (victory ? 120 * battle.tank.tier : 0)) * mult * (1 + sectorXp));
 
   save.credits += creditsEarned;
   tankSave(save.current).xp += xpEarned;
-  tankSave(save.current).crewXp += xpEarned;
+  tankSave(save.current).crewXp += Math.round(xpEarned * 1.6); // екіпаж — окрема смуга, не з'їдає дерево
   save.battles++;
   if (victory) save.wins++;
   save.totalFrags += battle.frags;
@@ -2073,8 +2065,17 @@ function useMedkit() {
 // ---------- ПОМІЧНИК: дружній бот-танк ----------
 // Баланс: 60% твоїх HP, 70% урону, без рикошету, живе до кінця раунду,
 // одночасно лише ОДИН. Він тисне і відтягує вогонь, але не виграє бій за тебе.
+const MAX_HELPERS = 2;
 function spawnHelper() {
-  if (battle.helper && !battle.helper.dead) { battle.helper.hp = battle.helper.maxHp; return; }
+  if (!battle.helpers) battle.helpers = [];
+  battle.helpers = battle.helpers.filter(h => !h.dead);
+  // якщо обидва вже в строю — другий трофей просто латає найпобитішого
+  if (battle.helpers.length >= MAX_HELPERS) {
+    const hurt = battle.helpers.reduce((a, b) => (a.hp / a.maxHp < b.hp / b.maxHp ? a : b));
+    hurt.hp = hurt.maxHp;
+    floatText(hurt.x, hurt.y - 26, '🤝 помічника полагоджено', '#6fd3ff');
+    return;
+  }
   const spot = findOpenSpot(60, 220) || { x: player.x, y: player.y - TILE };
   const hp = Math.max(6, Math.round(player.maxHp * 0.6));
   const h = {
@@ -2083,13 +2084,36 @@ function spawnHelper() {
     fireCd: Math.round(player.fireCd * 1.3), cooldown: 600, thinkTimer: 0,
     ally: true, dead: false, spawning: 0, tread: 0, flash: 0, cls: 'СТ',
   };
-  battle.helper = h;
-  floatText(h.x, h.y - 26, '🤝 ПОМІЧНИК У БОЮ!', '#39ff88');
+  battle.helpers.push(h);
+  floatText(h.x, h.y - 26, battle.helpers.length > 1 ? '🤝 ДРУГИЙ ПІЛОТ У БОЮ!' : '🤝 ПОМІЧНИК У БОЮ!', '#39ff88');
   sfx.cash();
 }
 
+function hitHelper(b) {
+  for (const h of (battle.helpers || [])) {
+    if (h.dead) continue;
+    if (Math.abs(b.x - h.x) >= h.size / 2 || Math.abs(b.y - h.y) >= h.size / 2) continue;
+    b.dead = true;
+    h.hp -= b.dmg;
+    h.flash = 90;
+    sfx.hit();
+    spawnParticles(b.x, b.y, '#6fd3ff', 5);
+    if (h.hp <= 0) {
+      h.dead = true;
+      spawnParticles(h.x, h.y, '#6fd3ff', 22);
+      floatText(h.x, h.y - 22, '🤝 помічника знищено', '#ff4d5e');
+      sfx.boom();
+    }
+    return true;
+  }
+  return false;
+}
+
 function updateHelper(dt) {
-  const h = battle.helper;
+  for (const h of (battle.helpers || [])) updateOneHelper(h, dt);
+}
+
+function updateOneHelper(h, dt) {
   if (!h || h.dead) return;
   if (h.flash > 0) h.flash -= dt;
   h.thinkTimer -= dt;
@@ -2860,8 +2884,8 @@ function draw() {
   }
 
   // помічник — блакитний, з підписом, щоб не сплутати з ворогом
-  if (battle.helper && !battle.helper.dead) {
-    const h = battle.helper;
+  for (const h of (battle.helpers || [])) {
+    if (h.dead) continue;
     drawTank(h, '#6fd3ff', false);
     ctx.font = '11px monospace';
     ctx.textAlign = 'center';
@@ -3024,7 +3048,7 @@ function drawMinimap() {
   }
   for (const d of drops) dot(d.x, d.y, CRATES[d.kind] ? '#ffd23f' : '#6fd3ff', 2);
   for (const e of enemies) if (!e.dead && !(e.spawning > 0)) dot(e.x, e.y, '#ff9d5c', 2.2);
-  if (battle.helper && !battle.helper.dead) dot(battle.helper.x, battle.helper.y, '#6fd3ff', 2.2);
+  for (const h of (battle.helpers || [])) if (!h.dead) dot(h.x, h.y, '#6fd3ff', 2.2);
   dot(player.x, player.y, '#39ff88', 3);
   // рамка того, що зараз видно на екрані
   ctx.strokeStyle = 'rgba(57,255,136,.6)';
@@ -3751,7 +3775,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v27 · нова музика: кінематографічний орган';
+const GAME_VERSION = 'v28 · швидше дерево, більше ворогів, другий пілот';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
