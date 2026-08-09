@@ -548,87 +548,173 @@ const sfx = {
   cash: () => { beep(660, 0.08, 'sine', 0.06); setTimeout(() => beep(990, 0.12, 'sine', 0.06), 90); },
 };
 
-// ---------- Музика: акуратний темний синтвейв, генерується на льоту ----------
+// ---------- Музика: кінематографічний орган (Interstellar-type) ----------
+// Три речі роблять цей звук: велика конволюційна реверберація, адитивний
+// орган замість пилки, і повільний крещендо через 16 тактів замість біту.
 const music = {
   on: localStorage.getItem('shMusic') !== '0',
-  started: false, step: 0, next: 0, timer: null, delay: null,
+  started: false, step: 0, next: 0, timer: null,
+  verb: null, master: null, sub: null, mode: 'hangar',
 };
 const NOTE = n => 55 * Math.pow(2, n / 12); // від A1
-// Dm — Bb — F — C: важчий, «броньований» настрій замість неонового
-const CHORDS = [
-  { root: 5,  tones: [0, 3, 7, 10] },
-  { root: 1,  tones: [0, 4, 7, 11] },
-  { root: 8,  tones: [0, 4, 7, 12] },
-  { root: 3,  tones: [0, 4, 7, 10] },
+const BPM = 92;
+
+// A — E/G# — F#m — D: світлий, відкритий рух без маршу.
+// Кожен акорд тримається цілий такт, гармонія майже не рухається — саме це
+// дає відчуття простору, а не «мелодії».
+const PROG = [
+  { bass: 0,  tones: [12, 16, 19, 24] },   // A
+  { bass: 11, tones: [11, 16, 19, 23] },   // E/G#
+  { bass: 9,  tones: [9,  16, 21, 24] },   // F#m
+  { bass: 5,  tones: [12, 17, 21, 24] },   // D
 ];
-// бас марширує рівно — крок гусениць
-const BASS_PAT = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1];
-const ARP_PAT  = [0, null, null, 2, null, 1, null, null, 3, null, null, 2, null, 1, null, null];
+// вісімковий остинато — головна впізнавана риса: рівний пульс органа
+const OSTINATO = [0, 2, 1, 3, 2, 1, 3, 2];
+
+function makeIR(seconds, decay) {
+  const rate = audioCtx.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
+  const buf = audioCtx.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      // шум, що згасає по степеневому закону — типовий штучний зал
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+  }
+  return buf;
+}
+
+// Адитивний орган: синуси на гармоніках + легкий розстрій = хорус труб
+function organNote(freq, t, dur, vol, partials, detune, attack) {
+  const g = audioCtx.createGain();
+  const a = attack === undefined ? 0.45 : attack;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + a);
+  g.gain.setValueAtTime(Math.max(0.0002, vol), t + Math.max(a, dur * 0.65));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const dets = detune ? [-4, 4] : [0];
+  for (const [mult, amp] of partials) {
+    for (const det of dets) {
+      const o = audioCtx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq * mult;
+      o.detune.value = det;
+      const pg = audioCtx.createGain();
+      pg.gain.value = amp / dets.length;
+      o.connect(pg); pg.connect(g);
+      o.start(t); o.stop(t + dur + 0.25);
+    }
+  }
+  g.connect(music.verb);
+  return g;
+}
+
+const ORGAN_PAD = [[1, 1], [2, 0.45], [3, 0.2], [4, 0.14], [6, 0.06], [8, 0.05]];
+const ORGAN_PLUCK = [[1, 1], [2, 0.35], [4, 0.12]];
 
 function startMusic() {
   if (music.started || !music.on) return;
   try {
     ensureAudio();
-    music.delay = audioCtx.createDelay(1);
-    music.delay.delayTime.value = 0.34;
-    const fb = audioCtx.createGain(); fb.gain.value = 0.32;
-    const wet = audioCtx.createGain(); wet.gain.value = 0.5;
-    music.delay.connect(fb); fb.connect(music.delay);
-    music.delay.connect(wet); wet.connect(audioCtx.destination);
+    music.master = audioCtx.createGain();
+    music.master.gain.value = 0.9;
+    music.master.connect(audioCtx.destination);
+
+    // зал: 4.2 с хвоста, приглушений верх — щоб не шипіло
+    const conv = audioCtx.createConvolver();
+    conv.buffer = makeIR(4.2, 2.6);
+    const wet = audioCtx.createGain(); wet.gain.value = 0.85;
+    const tame = audioCtx.createBiquadFilter();
+    tame.type = 'lowpass'; tame.frequency.value = 3200;
+    conv.connect(tame); tame.connect(wet); wet.connect(music.master);
+
+    // шина: сухий сигнал тихіший за відлуння — так простір читається
+    music.verb = audioCtx.createGain();
+    music.verb.gain.value = 1;
+    const dry = audioCtx.createGain(); dry.gain.value = 0.42;
+    music.verb.connect(conv);
+    music.verb.connect(dry); dry.connect(music.master);
+
+    // нижня педаль — тримається весь час, дає вагу без нот
+    const sub = audioCtx.createOscillator();
+    sub.type = 'sine'; sub.frequency.value = NOTE(-12); // A0
+    const sg = audioCtx.createGain(); sg.gain.value = 0.016; // заміряно: 0.055 забивало весь орган
+    sub.connect(sg); sg.connect(music.master);
+    sub.start();
+    music.sub = sub;
+
     music.started = true;
-    music.next = audioCtx.currentTime + 0.1;
-    music.timer = setInterval(musicSchedule, 60);
+    music.step = 0;
+    music.next = audioCtx.currentTime + 0.15;
+    music.timer = setInterval(musicSchedule, 90);
   } catch (e) {}
 }
+
 function musicSchedule() {
-  if (!music.on || !audioCtx) return;
-  const stepDur = 60 / 104 / 4; // 104 BPM — трохи бадьоріше, маршовий крок
-  while (music.next < audioCtx.currentTime + 0.25) {
-    musicStep(music.step, music.next, stepDur);
-    music.step = (music.step + 1) % 64;
-    music.next += stepDur;
+  if (!music.on || !audioCtx || !music.verb) return;
+  const eighth = 60 / BPM / 2;
+  while (music.next < audioCtx.currentTime + 0.4) {
+    musicStep(music.step, music.next, eighth);
+    music.step = (music.step + 1) % 128; // 16 тактів по 8 вісімок
+    music.next += eighth;
   }
 }
-function musicNote(freq, t, dur, type, vol, dest) {
-  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-  o.type = type; o.frequency.value = freq;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g); g.connect(dest || audioCtx.destination);
-  o.start(t); o.stop(t + dur + 0.05);
-}
-function musicStep(i, t, stepDur) {
-  const chord = CHORDS[Math.floor(i / 16) % 4];
-  const s16 = i % 16;
-  // бас — короткий важкий пульс (крок гусениці)
-  if (BASS_PAT[s16]) musicNote(NOTE(chord.root), t, stepDur * 1.3, 'square', 0.045);
-  // підбас октавою нижче на сильну долю
-  if (s16 % 8 === 0) musicNote(NOTE(chord.root) / 2, t, stepDur * 3, 'triangle', 0.05);
-  // мелодія — рідка, з відлунням
-  const arp = ARP_PAT[s16];
-  if (arp !== null) {
-    const oct = Math.floor(i / 32) % 2 ? 36 : 24;
-    musicNote(NOTE(chord.root + chord.tones[arp] + oct), t, stepDur * 2.2, 'triangle', 0.03, music.delay);
+
+function musicStep(i, t, eighth) {
+  const bar = Math.floor(i / 8);
+  const chord = PROG[bar % 4];
+  const e = i % 8;
+  // крещендо через 16 тактів і скидання — головна драматургія Ціммера
+  const arc = 0.45 + 0.55 * (bar / 16);
+  const battle = music.mode === 'battle';
+  const lvl = arc * (battle ? 1 : 0.7);
+
+  // акорд органа тримається цілий такт
+  if (e === 0) {
+    for (let k = 0; k < (battle ? 4 : 3); k++) {
+      const semi = chord.tones[k];
+      if (semi === undefined) continue;
+      organNote(NOTE(semi), t, eighth * 8.6, 0.085 * lvl, ORGAN_PAD, true, 0.6);
+    }
+    // бас акорду — окремо, нижче
+    organNote(NOTE(chord.bass) / 2, t, eighth * 8.6, 0.07 * lvl, ORGAN_PAD, false, 0.5);
   }
-  // «малий барабан» на 2 і 4 долю — маршовий каркас
-  if (s16 === 4 || s16 === 12) noiseBurstAt(t, 0.07, 'bandpass', 1900, 0.035);
-  if (s16 % 4 === 2) noiseBurstAt(t, 0.025, 'highpass', 7000, 0.01);
+
+  // вісімковий остинато — той самий рівний пульс
+  const oct = bar % 8 < 4 ? 24 : 36;
+  const semi = chord.tones[OSTINATO[e] % chord.tones.length];
+  organNote(NOTE(semi + oct - 12), t, eighth * 1.9, 0.05 * lvl, ORGAN_PLUCK, false, 0.012);
+
+  // цокання годинника на кожну долю — сухе, тихе, поза реверберацією
+  if (e % 2 === 0 && music.master) {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = 2400;
+    g.gain.setValueAtTime(0.012 * lvl, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    o.connect(g); g.connect(music.master);
+    o.start(t); o.stop(t + 0.05);
+  }
+
+  // у бою на кожен 4-й такт — низький підйом, «тиск»
+  if (battle && e === 0 && bar % 4 === 3) {
+    organNote(NOTE(chord.bass) / 2, t, eighth * 8, 0.06 * arc, [[1, 1], [2, 0.6], [3, 0.3]], true, 1.6);
+  }
 }
-function noiseBurstAt(t, dur, type, freq, vol) {
-  const src = audioCtx.createBufferSource();
-  src.buffer = getNoise();
-  const f = audioCtx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(f); f.connect(g); g.connect(audioCtx.destination);
-  src.start(t); src.stop(t + dur);
-}
+
+function setMusicMode(m) { music.mode = m; }
+
 function toggleMusic() {
   music.on = !music.on;
   localStorage.setItem('shMusic', music.on ? '1' : '0');
-  if (music.on) { music.started = false; startMusic(); }
+  if (!music.on) {
+    if (music.timer) clearInterval(music.timer);
+    music.timer = null;
+    if (music.master) music.master.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.3);
+    music.started = false;
+  } else {
+    music.started = false;
+    startMusic();
+  }
   flashMsg(music.on ? '🎵 Музика увімкнена' : '🔇 Музика вимкнена');
 }
 
@@ -636,6 +722,7 @@ function toggleMusic() {
 // sector = об'єкт сектора фронту, або null для вільного бою
 function startBattle(sector) {
   startMusic();
+  setMusicMode('battle');
   const st = tankStats(save.current);
   const elite = sector ? !!sector.boss : (save.battles + 1) % 5 === 0;
   const mapDef = sector
@@ -1579,6 +1666,7 @@ function endBattle(victory) {
 }
 
 function toHangar() {
+  setMusicMode('hangar');
   document.body.classList.remove('inBattle');
   document.getElementById('battleView').classList.add('hidden');
   // із секторного бою повертаємось на фронтову мапу, з вільного — в ангар
@@ -3663,7 +3751,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v26 · баланс штурму за даними повного прогону';
+const GAME_VERSION = 'v27 · нова музика: кінематографічний орган';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
@@ -3671,4 +3759,4 @@ requestAnimationFrame(loop);
 
 // хук для автотестів
 window.addEventListener('blur', () => { keys = {}; });
-window._dbg = { get: () => ({ state, battle, player, enemies, bullets, drops, spawnQueue, save, keys, grid }), killEnemy };
+window._dbg = { get: () => ({ state, battle, player, enemies, bullets, drops, spawnQueue, save, keys, grid }), killEnemy, music: () => music, ctx: () => audioCtx };
