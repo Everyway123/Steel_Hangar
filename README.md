@@ -23,6 +23,7 @@ No install, no account, no dependencies — one HTML file and one JS file.
 [![Play](https://img.shields.io/badge/▶_play_now-free-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/game1/)
 [![No dependencies](https://img.shields.io/badge/dependencies-zero-2fb7ff?style=for-the-badge&labelColor=0a0e14)](#under-the-hood)
 [![Vanilla JS](https://img.shields.io/badge/built_with-vanilla_JS-ffd23f?style=for-the-badge&labelColor=0a0e14)](#under-the-hood)
+[![MIT](https://img.shields.io/badge/license-MIT-7a8aa8?style=for-the-badge&labelColor=0a0e14)](LICENSE)
 
 </div>
 
@@ -186,6 +187,10 @@ game1/
 Bug reports welcome — especially with an exported battle log attached, that's the whole
 point of the logging. If you want to add a tank, a map or a crate, they're all plain data
 near the top of `game.js` (`TANKS`, `MAPS`, `CRATES`) — adding one is a few lines.
+
+## License
+
+[MIT](LICENSE). Fork it, learn from it, ship your own tank game.
 
 ---
 

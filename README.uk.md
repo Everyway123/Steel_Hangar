@@ -23,6 +23,7 @@
 [![Грати](https://img.shields.io/badge/▶_грати-безкоштовно-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/game1/)
 [![Без залежностей](https://img.shields.io/badge/залежностей-нуль-2fb7ff?style=for-the-badge&labelColor=0a0e14)](#як-це-зроблено)
 [![Чистий JS](https://img.shields.io/badge/зроблено_на-чистому_JS-ffd23f?style=for-the-badge&labelColor=0a0e14)](#як-це-зроблено)
+[![MIT](https://img.shields.io/badge/ліцензія-MIT-7a8aa8?style=for-the-badge&labelColor=0a0e14)](LICENSE)
 
 </div>
 
@@ -183,6 +184,10 @@ game1/
 Баг-репорти вітаються — особливо з прикладеним експортом лога боїв, заради цього
 логування й робилось. Хочеш додати танк, карту чи коробку — це звичайні дані
 на початку `game.js` (`TANKS`, `MAPS`, `CRATES`), додати одну штуку це кілька рядків.
+
+## Ліцензія
+
+[MIT](LICENSE). Форкай, вчися на ній, роби свою гру.
 
 ---
 
