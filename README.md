@@ -16,6 +16,16 @@ No install, no account, no dependencies — one HTML file and one JS file.
 
 ---
 
+<div align="center">
+
+## ▶ [**PLAY IN YOUR BROWSER**](https://everyway123.github.io/game1/)
+
+[![Play](https://img.shields.io/badge/▶_play_now-free-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/game1/)
+[![No dependencies](https://img.shields.io/badge/dependencies-zero-2fb7ff?style=for-the-badge&labelColor=0a0e14)](#under-the-hood)
+[![Vanilla JS](https://img.shields.io/badge/built_with-vanilla_JS-ffd23f?style=for-the-badge&labelColor=0a0e14)](#under-the-hood)
+
+</div>
+
 ## The pitch
 
 You get a scrappy tier-1 trainer and a silver balance that barely covers a gun upgrade.
@@ -28,6 +38,11 @@ Close the tab whenever — it all saves itself.
 > The game is in **Ukrainian**. The controls are arrows and spacebar; you'll be fine.
 
 ## Play it
+
+**[everyway123.github.io/game1](https://everyway123.github.io/game1/)** — click and you're in a battle.
+Nothing to install, no account, no ads. Works on a phone.
+
+Or run it locally:
 
 ```bash
 git clone https://github.com/Everyway123/game1.git

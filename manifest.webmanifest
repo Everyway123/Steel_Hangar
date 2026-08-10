@@ -1,0 +1,21 @@
+{
+  "name": "Сталевий Ангар — танкові бої з прокачкою",
+  "short_name": "Сталевий Ангар",
+  "description": "Бої по дві хвилини, ангар який усе пам'ятає, 14 танків і кампанія з 14 секторів.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "lang": "uk",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "docs/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "docs/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    { "src": "docs/battle.png", "sizes": "1128x1140", "type": "image/png", "form_factor": "wide", "label": "Бій" },
+    { "src": "docs/mobile.png", "sizes": "1170x2532", "type": "image/png", "form_factor": "narrow", "label": "На телефоні" }
+  ]
+}

@@ -16,6 +16,16 @@
 
 ---
 
+<div align="center">
+
+## ▶ [**ГРАТИ В БРАУЗЕРІ**](https://everyway123.github.io/game1/)
+
+[![Грати](https://img.shields.io/badge/▶_грати-безкоштовно-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/game1/)
+[![Без залежностей](https://img.shields.io/badge/залежностей-нуль-2fb7ff?style=for-the-badge&labelColor=0a0e14)](#як-це-зроблено)
+[![Чистий JS](https://img.shields.io/badge/зроблено_на-чистому_JS-ffd23f?style=for-the-badge&labelColor=0a0e14)](#як-це-зроблено)
+
+</div>
+
 ## Про що це
 
 Тобі дають задрипаний навчальний танк першого тіру і стільки срібла, що ледве вистачає
@@ -26,6 +36,11 @@
 Закривай вкладку коли завгодно — усе зберігається саме.
 
 ## Як запустити
+
+**[everyway123.github.io/game1](https://everyway123.github.io/game1/)** — тиснеш і вже в бою.
+Нічого встановлювати, без акаунта, без реклами. Працює на телефоні.
+
+Або локально:
 
 ```bash
 git clone https://github.com/Everyway123/game1.git
