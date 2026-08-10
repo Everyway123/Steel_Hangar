@@ -1,60 +1,183 @@
-# ⚙ СТАЛЕВИЙ АНГАР
+<div align="center">
 
-Танкові бої з прокачкою у стилі World of Tanks — казуальна гра для вечірніх сесій на 15–20 хвилин.
+# ⚙ STEEL HANGAR · СТАЛЕВИЙ АНГАР
 
-## 🎮 Як грати
+### Battle City grew up, went to war, and started counting its silver.
 
-Просто відкрий `index.html` у браузері — жодних встановлень.
+**A tank game about the twenty minutes you have left in the evening.**
+Two-minute battles. A hangar that remembers everything. A research tree with fourteen tanks.
+No install, no account, no dependencies — one HTML file and one JS file.
 
-> Якщо хочеться «по-дорослому»: `python3 -m http.server` у папці гри і відкрий http://localhost:8000
+`vanilla JS` · `zero dependencies` · `~190 KB total` · `runs from file://` · `desktop + mobile`
 
-## 🕹 Керування
+<img src="docs/battle.png" width="620" alt="Battle: two allied tanks, a twin-barrel buff running, HQ shield at 6/8">
 
-### Комп'ютер (тільки клавіатура — просто і казуально)
+</div>
 
-| Дія | Клавіші |
-|---|---|
-| Рух корпусу | WASD або стрілки |
-| Вогонь | Пробіл — куди дивишся, туди й летить (м'яке доведення ±20°) |
-| Аптечка | E (одна на бій) |
-| Пауза / вихід | Esc |
+---
 
-### Телефон
+## The pitch
 
-| Дія | Як |
-|---|---|
-| Рух | аналоговий джойстик ліворуч — веди пальцем, танк їде туди |
-| Вогонь | велика кнопка 💥 праворуч (з автоприцілом) |
-| Аптечка | кнопка 🔧 |
-| Пауза | ⏸ у правому верхньому куті |
+You get a scrappy tier-1 trainer and a silver balance that barely covers a gun upgrade.
+Ahead of you: fourteen sectors, an enemy HQ behind a steel shield, and a research tree
+that ends in a monster with two barrels.
 
-На телефоні ангар іде однією колонкою, «НА ФРОНТ!» закріплена внизу екрана,
-а фронт показується вертикальним списком секторів замість мапи.
+Every battle is **under two minutes**. Every battle moves something in the hangar.
+Close the tab whenever — it all saves itself.
 
-## 🧭 Як влаштована гра
+> The game is in **Ukrainian**. The controls are arrows and spacebar; you'll be fine.
 
-**Ангар → фронтова мапа → бій (3–5 хв) → нагорода → прокачка → далі по фронту.**
-Прогрес зберігається автоматично в браузері — можна закрити вкладку будь-коли.
+## Play it
 
-- **Гілка досліджень**: 14 танків у 4 гілках до 7-го тіру — розвідники ЛТ (до Т-50 «Привид»), універсали СТ (до Т-62 «Шквал»), важкі ВТ (до Об.705 «Титан») і ПТ-САУ (до Об.268 «Аспід»). Досвід заробляється на танку в боях і витрачається на дослідження наступного.
-- **Модулі**: 5 штук по 5 рівнів — гармата, броня, двигун, ходова (швидший розгін), радіо (+срібло). Всі 5/5 → танк стає ⚜ ЕЛІТНИМ (+10% срібла).
-- **Екіпаж**: качається з кожним боєм до 10-го рівня — +1.5% урону й швидкості та −1% перезарядки за рівень.
-- **Рикошети**: чим більше броні, тим частіше ворожі снаряди відскакують. Гілка важких — саме про це.
-- **Доктрини**: постачання раз на ~45 с — вибір з 3 карток на бій. Рідкісні дають силу за ціну слабкості, епічні (здвоєна гармата, фугаси) — лише в елітних боях.
-- **Аптечка [E]**: один ремонт на бій.
-- **Елітні бої**: кожен 5-й бій — бос «Сталевий Генерал» і подвійна нагорода.
-- **Медалі**: «Мисливець», «Сталева стіна», «Домінатор», «Генераловбивця».
-- **Фронтова кампанія**: мапа з 14 секторів від Плацдарму до ☭ Цитаделі. Кожен сектор — бій з модифікатором: 🌙 нічний бій, 🌫 туман, 💥 артобстріл, ☢ мінні поля, ❄ мороз. Звільнені сектори дають постійний бонус срібла. Взяв Цитадель — фронт відкривається знову, складніший (Фронт II, III...).
-- **Пауза [Esc]**, музика й соковиті звуки (WebAudio, генеруються на льоту; M — вимкнути музику). Саундтрек — кінематографічний орган у дусі Interstellar: конволюційна реверберація на 4.2 с, адитивний орган замість пилки, вісімковий остинато і повільний крещендо через 16 тактів. У бою звучить щільніше, ніж в ангарі.
-- **Два режими бою**: «Зачистка» — знищ усі танки; «Штурм» — прорвися до ворожого штабу ☭ і знищ його, поки йдуть підкріплення (обмежені, щоб бій не тягнувся вічно).
-- **Карта ×2**: поле вдвічі ширше за екран, камера їде за танком, у правому верхньому куті — міні-мапа з рамкою видимої зони.
-- **25 трофейних коробок**: 15 чистих плюсів (🔫 другий ствол, 🛰 самонаведення, ☄ фугаси, ⚡ автозаряджання, 🎯 бронебійні, 🧊 кріо, 🛡 захист, ❤️ ремкомплект, 🧱 інженерний набір, 🚀 форсаж, 💨 димогенератор, 🕵 розвідка, ❄️ заморозка, 💰 мародер, 🤝 помічник) і 10 плюс-мінусів (⚔ штурмовий заряд, 🏎 полегшений корпус, 🐌 бетонні гусениці, 🔥 перегрів ствола, 💣 нестабільні БК, 🩸 вампір, 👁 снайперський режим, 😤 берсерк, 🎲 лотерея, ☢ реактор). Мінус ніколи не вбиває, одночасно активні максимум 3. Вороги теж полюють за трофеями.
-- **🤝 Помічник**: дружній бот-танк — 60% твоїх HP, 70% урону, живе до кінця раунду, завжди один.
-- **Щит штабу**: ворожа база ☭ під сталевим щитом, доки не виб'єш половину передового загону.
-- **Кодекс трофеїв** в ангарі: знайдені коробки відкриваються назавжди.
-- **Скіни**: у кожного з 14 танків власний корпус, накладна броня і ствол; Титан і Аспід — здвоєні.
-- **Жива карта**: вибухові бочки ☢ (ланцюгові вибухи!), пісок сповільнює, вода не пропускає, у кущах можна ховатися, цегла руйнується.
+```bash
+git clone https://github.com/Everyway123/game1.git
+open game1/index.html          # that's it
+```
 
-## 🛠 Технічно
+No build step. No `npm install`. Open the file.
 
-Чистий JavaScript + Canvas, без залежностей. Два файли: `index.html` (ангар та інтерфейс) і `game.js` (вся логіка). Збереження — `localStorage`.
+## What's in it
+
+<table>
+<tr><td width="50%">
+
+### 🌳 Fourteen tanks, four branches
+Scouts, mediums, heavies, tank destroyers — up to tier 7.
+Earn tank XP to research the next one, silver to buy it,
+crew XP that quietly makes everything better.
+Every module maxed → the tank goes **ELITE**.
+
+</td><td width="50%">
+
+### 🎁 Twenty-five field crates
+Fifteen are pure upgrades. **Ten cost you something.**
+Twin barrel, homing shells, HEAT, autoloader —
+or Berserk (damage climbs as you bleed),
+Overheat (fires twice as fast, hurts you every shot),
+Lottery (could be anything).
+
+</td></tr>
+<tr><td>
+
+### 🛡 A round with an arc
+The enemy HQ sits behind a **steel shield** until you've broken
+half their forward group. So a round isn't a flat grind —
+it's a fight for advantage, then a breakthrough.
+
+</td><td>
+
+### 🗺 Maps twice as wide as your screen
+The camera follows your tank; a minimap keeps the whole
+battlefield in view. Bushes hide you. Barrels chain-explode.
+Ice makes you drift. Walls take three shots, not one.
+
+</td></tr>
+<tr><td>
+
+### 🤝 Allied pilots
+A rare crate brings a friendly tank into the fight —
+60% of your health, 70% of your damage, and it draws fire.
+Find a second one and you're rolling three deep.
+
+</td><td>
+
+### 🎼 A soundtrack with no audio files
+Cinematic organ, generated live in WebAudio: a 4.2-second
+convolution reverb built at runtime, additive organ pipes
+instead of a sawtooth, an eighth-note ostinato and a slow
+sixteen-bar crescendo. Denser in battle than in the hangar.
+
+</td></tr>
+</table>
+
+---
+
+<div align="center">
+
+### The hangar remembers everything
+
+<img src="docs/hangar.png" width="760" alt="Hangar: research tree, tank stats, modules, trophy codex">
+
+### Fourteen sectors from the Bridgehead to the ☭ Citadel
+
+<img src="docs/front.png" width="760" alt="Front campaign map with sectors and battle modifiers">
+
+### Fourteen tanks, fourteen silhouettes
+
+<img src="docs/tanks.png" width="820" alt="All 14 tank skins: spaced armour, side skirts, camo nets, twin barrels">
+
+</div>
+
+---
+
+## Details worth the scroll
+
+**Every battle logs itself.** Frags, damage taken, ricochets, doctrines picked, seconds
+elapsed, map, mode — straight to `localStorage`, exportable as JSON from the hangar.
+The analytics panel reads it back: win rate by tank, by map, last ten battles.
+
+**Balance here is measured, not vibed.** Assault mode was tuned after 24 controlled battles
+per mode on an identical tank — 63% wins in Clear against 29% in Assault, so the reward went
+up rather than the difficulty down. Enemy fire rate was set by counting shots per second with
+a probe, not by ear. The music got rebalanced because an `AnalyserNode` showed the sub pedal
+was drowning the organ at 43 Hz.
+
+**Five battlefield modifiers.** Fog, night, artillery bombardment, minefields, deep frost —
+each attached to specific campaign sectors.
+
+**Enemies want the loot too.** They'll break off and drive for a crate, and a buffed enemy
+wears its icon overhead. See a 🛰 above a red tank and start moving: that one's shells follow you.
+
+---
+
+## Controls
+
+| | Keyboard | Phone |
+|---|---|---|
+| Move | `WASD` / arrows | analog stick |
+| Fire | `Space` — it goes where you're facing | big 💥 button, with auto-aim |
+| Repair kit | `E` | 🔧 |
+| Pause | `Esc` | ⏸ |
+| Music | `M` | — |
+
+On a phone the hangar collapses to one column, **INTO BATTLE** sticks to the bottom of the
+screen, and the campaign becomes a vertical list instead of a map.
+
+<div align="center">
+<img src="docs/mobile.png" width="270" alt="Mobile: analog stick, big fire button, playfield centred">
+</div>
+
+---
+
+## Under the hood
+
+Two files. `index.html` is the hangar, the campaign map and the overlays;
+`game.js` is everything else — about 3 800 lines of it. Canvas 2D for rendering,
+WebAudio for every sound (all synthesised, no samples), `localStorage` for saves
+with migration for older ones.
+
+No framework, no bundler, no assets folder. The tanks are drawn with paths and gradients,
+the explosions are particles, the reverb is a noise buffer with a power-law decay.
+
+```
+game1/
+├── index.html      hangar UI, campaign map, overlays, styles
+├── game.js         game loop, AI, rendering, audio, save
+└── docs/           screenshots
+```
+
+## Contributing
+
+Bug reports welcome — especially with an exported battle log attached, that's the whole
+point of the logging. If you want to add a tank, a map or a crate, they're all plain data
+near the top of `game.js` (`TANKS`, `MAPS`, `CRATES`) — adding one is a few lines.
+
+---
+
+<div align="center">
+
+**[🇺🇦 Опис українською →](README.uk.md)**
+
+Built with [Claude Code](https://claude.com/claude-code).
+
+</div>

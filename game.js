@@ -3118,7 +3118,7 @@ function drawHud() {
   if (battle.perks.length) {
     ctx.font = '15px monospace';
     ctx.fillStyle = '#8fa2c4';
-    ctx.fillText(battle.perks.map(p => p.ico).join('').slice(0, 8), 190, midY);
+    ctx.fillText(battle.perks.map(p => p.ico).join('').slice(0, 6), 232, midY);
   }
 
   // центр: час до кінця бою + таймер постачання
@@ -3148,7 +3148,7 @@ function drawHud() {
   ctx.textAlign = 'left';
   ctx.font = 'bold 13px monospace';
   ctx.fillStyle = battle.waveFlash > 0 ? '#ff4d5e' : '#8fa2c4';
-  ctx.fillText('🌊 ' + battle.wave, 160, midY);
+  ctx.fillText('🌊' + battle.wave, 196, midY);
 
   // праворуч: аптечка
   ctx.textAlign = 'right';
