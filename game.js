@@ -3863,7 +3863,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v28 · швидше дерево, більше ворогів, другий пілот';
+const GAME_VERSION = 'v29 · один екран, союзник, фортеця, музика під ситуацію';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
