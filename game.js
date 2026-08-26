@@ -393,8 +393,8 @@ const ENEMY_TYPES = {
 
 function buildRoster(tier, elite) {
   const pool = [];
-  // карта вдвічі ширша за стару — на ній 7+tier ворогів губилися
-  const count = 10 + tier;
+  // щільний бій на одному екрані: ростер тримає раунд, а не закінчується за 40 с
+  const count = 22 + tier * 3;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -414,13 +414,13 @@ const SUPPLY_MS = 45000;              // (лишається як страхов
 // заміряно тестом enemyfire.js — ціль ~1.3 постр/с на т1 і ~3 постр/с на т4+
 function enemyFireGap() {
   const tier = battle.tank.tier;
-  return tier <= 2 ? 520 : tier <= 3 ? 400 : 300;
+  return tier <= 2 ? 380 : tier <= 3 ? 300 : 220;
 }
 const SUPPLY_COST = 100;              // бойових очок на одне постачання
 // очки за дії: фраг, урон, шкода ворожій базі — сила заробляється боєм
 const PTS = { frag: 12, dmg: 1, hqDmg: 3, base: 25 };
 const BATTLE_LIMIT_MS = 120000; // 2 хвилини — жорстка межа раунду
-const MAX_WAVES = 3;            // дві хвилі підкріплень за бій, далі ростер скінченний
+const MAX_WAVES = 4;            // три хвилі підкріплень за бій, далі ростер скінченний
 const PERKS = [
   // польові — прості, але відчутні
   { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+60% срібла за кожен фраг до кінця бою',
@@ -459,16 +459,13 @@ const CLS_RAMP = { 'ЛТ': 160, 'СТ': 260, 'ВТ': 420, 'ПТ': 300 };
 // ============================================================
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-// Світ удвічі ширший за вікно: камера їде за танком, у HUD — міні-мапа
-const TILE = 40, COLS = 32, ROWS = 14;
+// Усе поле — один екран: жодної камери, жодного скролу, все видно одразу
+const TILE = 40, COLS = 16, ROWS = 14;
 const VIEW_COLS = 16;
 const W = COLS * TILE, H = ROWS * TILE;
 const VIEW_W = VIEW_COLS * TILE;   // ширина полотна = те, що видно
-let camX = 0;
-function updateCamera() {
-  const want = player.x - VIEW_W / 2;
-  camX = Math.max(0, Math.min(W - VIEW_W, want));
-}
+const camX = 0;   // поле дорівнює вікну — камера більше не потрібна
+function updateCamera() {}
 const HUD_TOP = 42, HUD_BOT = 46; // смуги HUD поза ігровим полем
 const T_EMPTY = 0, T_BRICK = 1, T_STEEL = 2, T_WATER = 3, T_BUSH = 4, T_SAND = 5, T_BARREL = 6, T_HQ = 7, T_HEDGE = 8, T_FENCE = 9, T_ICE = 10, T_TURRET = 11, T_HOME = 12;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -558,19 +555,67 @@ const music = {
   verb: null, master: null, sub: null, mode: 'hangar',
 };
 const NOTE = n => 55 * Math.pow(2, n / 12); // від A1
-const BPM = 92;
 
-// A — E/G# — F#m — D: світлий, відкритий рух без маршу.
-// Кожен акорд тримається цілий такт, гармонія майже не рухається — саме це
-// дає відчуття простору, а не «мелодії».
-const PROG = [
-  { bass: 0,  tones: [12, 16, 19, 24] },   // A
-  { bass: 11, tones: [11, 16, 19, 23] },   // E/G#
-  { bass: 9,  tones: [9,  16, 21, 24] },   // F#m
-  { bass: 5,  tones: [12, 17, 21, 24] },   // D
+
+// ---------- Треки під ситуацію раунду ----------
+// Орган лишається, але тільки там, де він доречний — в ангарі й на босі.
+// Основний бій тепер 8-бітний: квадрат, шумові барабани, темп удвічі швидший.
+const P_CALM = [  // A — E/G# — F#m — D: світло й простір
+  { bass: 0,  tones: [12, 16, 19, 24] },
+  { bass: 11, tones: [11, 16, 19, 23] },
+  { bass: 9,  tones: [9,  16, 21, 24] },
+  { bass: 5,  tones: [12, 17, 21, 24] },
 ];
-// вісімковий остинато — головна впізнавана риса: рівний пульс органа
-const OSTINATO = [0, 2, 1, 3, 2, 1, 3, 2];
+const P_DRIVE = [ // Am — F — C — G: класичний драйв чиптюна
+  { bass: 0,  tones: [12, 15, 19, 24] },
+  { bass: 8,  tones: [8,  12, 17, 20] },
+  { bass: 3,  tones: [15, 19, 22, 27] },
+  { bass: 10, tones: [10, 14, 17, 22] },
+];
+const P_MINOR = [ // Dm — Bb — Gm — A: тиск
+  { bass: 5,  tones: [17, 20, 24, 29] },
+  { bass: 1,  tones: [13, 17, 20, 25] },
+  { bass: 10, tones: [10, 13, 17, 22] },
+  { bass: 0,  tones: [12, 16, 19, 24] },
+];
+const P_TENSE = [ // хроматичний спуск — тривога без мелодії
+  { bass: 3,  tones: [15, 18, 22, 27] },
+  { bass: 2,  tones: [14, 17, 21, 26] },
+  { bass: 1,  tones: [13, 16, 20, 25] },
+  { bass: 0,  tones: [12, 15, 20, 24] },
+];
+const P_BRIGHT = [ // C — G — Am — F: перемога
+  { bass: 3,  tones: [15, 19, 22, 27] },
+  { bass: 10, tones: [14, 17, 22, 26] },
+  { bass: 0,  tones: [12, 15, 19, 24] },
+  { bass: 8,  tones: [12, 17, 20, 24] },
+];
+const P_HEAVY = [ // Em — C — G — D, повільно і низько
+  { bass: 7,  tones: [7, 10, 14, 19] },
+  { bass: 3,  tones: [3, 7,  12, 15] },
+  { bass: 10, tones: [10, 14, 17, 22] },
+  { bass: 5,  tones: [5, 9,  12, 17] },
+];
+
+const TRACKS = {
+  hangar:  { bpm: 92,  voice: 'organ', wet: 0.9,  drums: 0, prog: P_CALM,   ost: [0, 2, 1, 3, 2, 1, 3, 2], lvl: 0.65 },
+  battle:  { bpm: 132, voice: 'chip',  wet: 0.22, drums: 1, prog: P_DRIVE,  ost: [0, 1, 2, 1, 3, 2, 1, 0], lvl: 1 },
+  pressure:{ bpm: 152, voice: 'chip',  wet: 0.18, drums: 2, prog: P_MINOR,  ost: [0, 3, 2, 3, 1, 3, 2, 3], lvl: 1.1 },
+  danger:  { bpm: 164, voice: 'chip',  wet: 0.3,  drums: 2, prog: P_TENSE,  ost: [0, 1, 0, 2, 0, 1, 0, 3], lvl: 1.15 },
+  victory: { bpm: 126, voice: 'chip',  wet: 0.35, drums: 1, prog: P_BRIGHT, ost: [0, 2, 3, 2, 1, 2, 3, 2], lvl: 1.05 },
+  boss:    { bpm: 104, voice: 'organ', wet: 0.8,  drums: 2, prog: P_HEAVY,  ost: [0, 0, 1, 0, 2, 0, 1, 0], lvl: 1.1 },
+};
+
+// Яка музика доречна прямо зараз
+function pickMood() {
+  if (state !== 'play' || !battle) return 'hangar';
+  if (battle.elite) return 'boss';
+  if (player.maxHp && player.hp / player.maxHp < 0.32) return 'danger';
+  if (battle.hqLeft > 0 && !battle.hqSealed) return 'victory';
+  const alive = enemies.filter(e => !e.dead && !(e.spawning > 0)).length;
+  if (battle.waveFlash > 0 || alive >= Math.max(3, maxAlive - 1)) return 'pressure';
+  return 'battle';
+}
 
 function makeIR(seconds, decay) {
   const rate = audioCtx.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
@@ -625,6 +670,7 @@ function startMusic() {
     const conv = audioCtx.createConvolver();
     conv.buffer = makeIR(4.2, 2.6);
     const wet = audioCtx.createGain(); wet.gain.value = 0.85;
+    music.wetGain = wet;
     const tame = audioCtx.createBiquadFilter();
     tame.type = 'lowpass'; tame.frequency.value = 3200;
     conv.connect(tame); tame.connect(wet); wet.connect(music.master);
@@ -635,6 +681,12 @@ function startMusic() {
     const dry = audioCtx.createGain(); dry.gain.value = 0.42;
     music.verb.connect(conv);
     music.verb.connect(dry); dry.connect(music.master);
+    // окрема суха шина для 8-бітних голосів і барабанів — вони не мають «плавати»
+    music.dry = audioCtx.createGain();
+    music.dry.gain.value = 1;
+    music.dry.connect(music.master);
+    const chipSend = audioCtx.createGain(); chipSend.gain.value = 0.25;
+    music.dry.connect(chipSend); chipSend.connect(conv);
 
     // нижня педаль — тримається весь час, дає вагу без нот
     const sub = audioCtx.createOscillator();
@@ -645,6 +697,7 @@ function startMusic() {
     music.sub = sub;
 
     music.started = true;
+    music.track = 'hangar';
     music.step = 0;
     music.next = audioCtx.currentTime + 0.15;
     music.timer = setInterval(musicSchedule, 90);
@@ -653,52 +706,96 @@ function startMusic() {
 
 function musicSchedule() {
   if (!music.on || !audioCtx || !music.verb) return;
-  const eighth = 60 / BPM / 2;
+  const tr = TRACKS[music.track] || TRACKS.hangar;
+  const eighth = 60 / tr.bpm / 2;
   while (music.next < audioCtx.currentTime + 0.4) {
+    // трек міняється лише на межі такту — інакше зміна ріже вухо
+    if (music.step % 8 === 0) {
+      const want = pickMood();
+      if (want !== music.track) {
+        music.track = want;
+        if (music.wetGain) music.wetGain.gain.setTargetAtTime(TRACKS[want].wet, audioCtx.currentTime, 0.25);
+      }
+    }
     musicStep(music.step, music.next, eighth);
     music.step = (music.step + 1) % 128; // 16 тактів по 8 вісімок
     music.next += eighth;
   }
 }
 
+// 8-бітний голос: квадрат із різкою атакою, без хвоста
+function chipNote(freq, t, dur, vol, type) {
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(music.dry);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+
+// барабани: бочка — синус, що падає; малий і хет — фільтрований шум
+function drumKick(t, vol) {
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  o.connect(g); g.connect(music.dry);
+  o.start(t); o.stop(t + 0.2);
+}
+function drumNoise(t, dur, freq, type, vol) {
+  const src = audioCtx.createBufferSource();
+  src.buffer = getNoise();
+  const f = audioCtx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f); f.connect(g); g.connect(music.dry);
+  src.start(t); src.stop(t + dur);
+}
+
 function musicStep(i, t, eighth) {
+  const tr = TRACKS[music.track] || TRACKS.hangar;
   const bar = Math.floor(i / 8);
-  const chord = PROG[bar % 4];
+  const chord = tr.prog[bar % 4];
   const e = i % 8;
-  // крещендо через 16 тактів і скидання — головна драматургія Ціммера
-  const arc = 0.45 + 0.55 * (bar / 16);
-  const battle = music.mode === 'battle';
-  const lvl = arc * (battle ? 1 : 0.7);
+  // крещендо через 16 тактів і скидання
+  const arc = 0.5 + 0.5 * (bar / 16);
+  const lvl = arc * tr.lvl;
 
-  // акорд органа тримається цілий такт
-  if (e === 0) {
-    for (let k = 0; k < (battle ? 4 : 3); k++) {
-      const semi = chord.tones[k];
-      if (semi === undefined) continue;
-      organNote(NOTE(semi), t, eighth * 8.6, 0.085 * lvl, ORGAN_PAD, true, 0.6);
+  if (tr.voice === 'organ') {
+    if (e === 0) {
+      for (let k = 0; k < 4; k++) {
+        const semi = chord.tones[k];
+        if (semi === undefined) continue;
+        organNote(NOTE(semi), t, eighth * 8.6, 0.085 * lvl, ORGAN_PAD, true, 0.6);
+      }
+      organNote(NOTE(chord.bass) / 2, t, eighth * 8.6, 0.07 * lvl, ORGAN_PAD, false, 0.5);
     }
-    // бас акорду — окремо, нижче
-    organNote(NOTE(chord.bass) / 2, t, eighth * 8.6, 0.07 * lvl, ORGAN_PAD, false, 0.5);
+    const oct = bar % 8 < 4 ? 24 : 36;
+    const semi = chord.tones[tr.ost[e] % chord.tones.length];
+    organNote(NOTE(semi + oct - 12), t, eighth * 1.9, 0.05 * lvl, ORGAN_PLUCK, false, 0.012);
+  } else {
+    // 8-бітний шар: бас квадратом, ведучий голос вісімками, підголосок трикутником
+    if (e % 2 === 0) chipNote(NOTE(chord.bass) / 2, t, eighth * 1.7, 0.075 * lvl, 'square');
+    const semi = chord.tones[tr.ost[e] % chord.tones.length];
+    chipNote(NOTE(semi + 12), t, eighth * 0.85, 0.055 * lvl, 'square');
+    if (e === 0 || e === 5) chipNote(NOTE(chord.tones[1] + 24), t, eighth * 1.4, 0.03 * lvl, 'triangle');
   }
 
-  // вісімковий остинато — той самий рівний пульс
-  const oct = bar % 8 < 4 ? 24 : 36;
-  const semi = chord.tones[OSTINATO[e] % chord.tones.length];
-  organNote(NOTE(semi + oct - 12), t, eighth * 1.9, 0.05 * lvl, ORGAN_PLUCK, false, 0.012);
-
-  // цокання годинника на кожну долю — сухе, тихе, поза реверберацією
-  if (e % 2 === 0 && music.master) {
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = 'sine'; o.frequency.value = 2400;
-    g.gain.setValueAtTime(0.012 * lvl, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
-    o.connect(g); g.connect(music.master);
-    o.start(t); o.stop(t + 0.05);
-  }
-
-  // у бою на кожен 4-й такт — низький підйом, «тиск»
-  if (battle && e === 0 && bar % 4 === 3) {
-    organNote(NOTE(chord.bass) / 2, t, eighth * 8, 0.06 * arc, [[1, 1], [2, 0.6], [3, 0.3]], true, 1.6);
+  // барабани: 0 — нема, 1 — базовий біт, 2 — щільний
+  if (tr.drums && music.dry) {
+    if (e === 0 || e === 4) drumKick(t, 0.13 * lvl);
+    if (e === 2 || e === 6) drumNoise(t, 0.09, 1800, 'bandpass', 0.055 * lvl);
+    if (tr.drums === 2) {
+      drumNoise(t, 0.03, 8000, 'highpass', 0.022 * lvl);
+      if (e === 7) drumKick(t + eighth * 0.5, 0.1 * lvl);
+    } else if (e % 2 === 1) {
+      drumNoise(t, 0.025, 8000, 'highpass', 0.014 * lvl);
+    }
   }
 }
 
@@ -756,14 +853,10 @@ function startBattle(sector) {
 
   grid = []; gridHp = [];
   spawnPoints = []; enemies = []; bullets = []; particles = []; drops = [];
+  const hqCells = [];
   for (let r = 0; r < ROWS; r++) {
     grid[r] = []; gridHp[r] = [];
-    // карта вдвічі ширша: праву половину робимо дзеркальною копією лівої.
-    // Маркери 'P' і 'H' у дзеркалі прибираємо (гравець і штаб мають бути одні),
-    // а спавни 'E' лишаємо — вороги приходять з обох країв
-    const src = (mapDef.map[r] || '').padEnd(VIEW_COLS, '.').slice(0, VIEW_COLS);
-    const mirrored = src.split('').reverse().join('').replace(/[PH]/g, '.');
-    const row = (src + mirrored).padEnd(COLS, '.');
+    const row = (mapDef.map[r] || '').padEnd(COLS, '.');
     for (let c = 0; c < COLS; c++) {
       const ch = row[c];
       let t = T_EMPTY, hp = 0;
@@ -777,8 +870,8 @@ function startBattle(sector) {
       else if (ch === 'i') t = T_ICE;
       else if (ch === 'T') { t = T_TURRET; hp = 10 + 4 * st.tier; }
       else if (ch === 'o') { t = T_BARREL; hp = 1; }
-      else if (ch === 'H') { t = T_HQ; hp = 14 + 5 * st.tier; }
-      else if (ch === 'P') { player.x = COLS * TILE / 2 - TILE / 2; player.y = r * TILE + TILE / 2; }
+      else if (ch === 'H') { t = T_HQ; hp = (14 + 5 * st.tier) * 2; hqCells.push([r, c]); }
+      else if (ch === 'P') { player.x = c * TILE + TILE / 2; player.y = r * TILE + TILE / 2; }
       else if (ch === 'E') spawnPoints.push({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 });
       grid[r][c] = t; gridHp[r][c] = hp;
     }
@@ -791,7 +884,10 @@ function startBattle(sector) {
   // ---- БАЗИ: на кожній карті є твоя ★ (захищай) і ворожа ☭ (руйнуй) ----
   // мур П-подібний: бік, звернений до поля, лишається відкритим,
   // інакше і вороги, і ящики замуровуються наглухо
-  const putBase = (r, c, tile, hp, openSide) => {
+  // fortify = ворожий штаб: борти сталеві, пробити можна лише з відкритого боку,
+  // і той бік ще прикритий двома ДОТами. Раніше штаб зносився за 33 секунди
+  // повз увесь ростер — тепер це справжня ціль, а не обхідний шлях
+  const putBase = (r, c, tile, hp, openSide, fortify) => {
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
     grid[r][c] = tile; gridHp[r][c] = hp;
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
@@ -800,10 +896,19 @@ function startBattle(sector) {
       if (openSide === 'down' && dr === 1) continue;   // прохід знизу
       if (openSide === 'up' && dr === -1) continue;    // прохід згори
       if (grid[rr][cc] === T_EMPTY || grid[rr][cc] === T_SAND || grid[rr][cc] === T_ICE) {
-        // мур навколо бази — тонший за звичайну цеглу: його призначення
-        // пробивати, а не тримати. З 6 HP штурм ставав непрохідним
-        grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 3;
+        // у фортеці кути й борти незламні, лише лоб цегляний
+        const corner = dr !== 0 && dc !== 0;
+        if (fortify && (corner || dc !== 0)) { grid[rr][cc] = T_STEEL; gridHp[rr][cc] = 0; }
+        else { grid[rr][cc] = T_BRICK; gridHp[rr][cc] = fortify ? 8 : 3; }
       }
+    }
+    if (!fortify) return;
+    // два ДОТи по флангах прикривають єдиний підхід
+    const gr = openSide === 'down' ? r + 2 : r - 2;
+    for (const gc of [c - 2, c + 2]) {
+      if (gr < 0 || gr >= ROWS || gc < 0 || gc >= COLS) continue;
+      if (grid[gr][gc] !== T_EMPTY && grid[gr][gc] !== T_SAND && grid[gr][gc] !== T_ICE) continue;
+      grid[gr][gc] = T_TURRET; gridHp[gr][gc] = 12 + 5 * st.tier;
     }
   };
   // прибираємо стіни, що могли б замурувати точки спавну ворогів
@@ -835,6 +940,9 @@ function startBattle(sector) {
     }
   };
 
+  // штаби, намальовані на карті, теж отримують фортецю
+  for (const [hr, hc2] of hqCells) putBase(hr, hc2, T_HQ, gridHp[hr][hc2], 'down', true);
+
   const baseHp = 12 + 4 * st.tier;
   // ворожа база — вгорі по центру (якщо карта не має власних штабів)
   if (battle.hqLeft === 0) {
@@ -842,7 +950,7 @@ function startBattle(sector) {
     // просто на спавн і бій виграється пострілом угору за 8 секунд без руху
     const pcol = Math.floor(player.x / TILE);
     const hc = Math.max(1, Math.min(COLS - 2, pcol + (pcol < COLS / 2 ? 3 : -3)));
-    putBase(1, hc, T_HQ, baseHp, 'down'); // підхід знизу відкритий
+    putBase(1, hc, T_HQ, baseHp * 2, 'down', true); // фортеця: підхід лише знизу
     battle.hqLeft = 1;
   }
   // твоя база — ПІД спавном гравця, ніколи не на ньому:
@@ -904,7 +1012,12 @@ function startBattle(sector) {
   }
 
   // на кожній карті лежать дві кинуті гармати — заїдь і бий двома стволами
-  dropGunEmplacements(4);
+  dropGunEmplacements(3);
+
+  // союзник у строю з першої секунди: він відтягує частину вогню, і саме
+  // це дозволяє поставити на поле вдвічі більше ворогів, не вбиваючи гравця
+  battle.helpers = [];
+  spawnHelper();
 
   spawnQueue = buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
@@ -915,7 +1028,7 @@ function startBattle(sector) {
   // провокує кидатись на нього крізь вогонь
   battle.sealGoal = Math.ceil(spawnQueue.length / 2);
   battle.hqSealed = true;
-  maxAlive = Math.min(12, 7 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
+  maxAlive = Math.min(16, 11 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -1133,7 +1246,7 @@ function updateEnemy(e, dt) {
     e.thinkTimer = 400 + Math.random() * 1200;
     // половина ворогів суне до ТВОЄЇ БАЗИ — не можна просто відсидітись
     const homeX = battle.homeC * TILE + TILE / 2, homeY = battle.homeR * TILE + TILE / 2;
-    const goHome = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME && Math.random() < 0.45;
+    const goHome = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME && Math.random() < 0.62;
     // трофей поруч — ворог звертає за ним: тепер це гонка, а не безкоштовний бонус
     // за трофеєм біжить лише половина ворогів і лише зблизька:
     // інакше вони вимітають карту раніше, ніж ти встигаєш доїхати
@@ -1216,7 +1329,7 @@ function updateEnemy(e, dt) {
                (() => {
                  const hx = battle.homeC * TILE + TILE / 2, hy = battle.homeR * TILE + TILE / 2;
                  const hd = Math.hypot(hx - e.x, hy - e.y);
-                 if (hd > 200 || !hasLOS(e.x, e.y, hx, hy)) return false;
+                 if (hd > 300 || !hasLOS(e.x, e.y, hx, hy)) return false;
                  const a = Math.atan2(hy - e.y, hx - e.x);
                  const df = Math.abs(((a - facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
                  if (df > 0.6) { // довертається до бази
@@ -1333,6 +1446,10 @@ function updateBullets(dt) {
         shakeTime = 200;
         spawnParticles(b.x, b.y, '#39ff88', 8);
         floatText(b.x, b.y - 20, '★ БАЗА!', '#ff4d5e');
+        if (!battle.homeWarned && gridHp[r][c] <= battle.homeMax * 0.6) {
+          battle.homeWarned = true;
+          floatText(player.x, player.y - 40, '⚠ ТВОЮ БАЗУ ЛАМАЮТЬ — НАЗАД!', '#ff4d5e');
+        }
         if (gridHp[r][c] <= 0) { destroyHome(r, c); return; }
       }
       continue;
@@ -3017,57 +3134,28 @@ function draw() {
 
   ctx.restore();
   drawHud(); // поверх усього, без тремтіння екрана
-  drawMinimap();
+  drawStatusPanel();
 }
 
 // Міні-мапа: карта вдвічі ширша за екран, тож потрібен огляд усього поля
-function drawMinimap() {
+// Статус-панель у кутку поля: щит штабу і активні трофеї.
+// Міні-мапу прибрано — на одному екрані видно все і без неї.
+function drawStatusPanel() {
   if (!battle || (state !== 'play' && state !== 'perk')) return;
-  const mw = 148, mh = Math.round(mw * H / W), mx = VIEW_W - mw - 8, my = HUD_TOP + 8;
-  const sx = mw / W, sy = mh / H;
+  const buffs = (player.buffs || []);
+  const lines = (battle.hqLeft > 0 ? 1 : 0) + buffs.length;
+  if (!lines) return;
+  const w = 186, x = VIEW_W - w - 8, y = HUD_TOP + 8;
   ctx.save();
-  ctx.globalAlpha = 0.82;
+  ctx.globalAlpha = 0.72;
   ctx.fillStyle = '#05070c';
-  ctx.fillRect(mx, my, mw, mh);
+  ctx.fillRect(x, y, w, lines * 17 + 8);
   ctx.strokeStyle = '#263149';
   ctx.lineWidth = 1;
-  ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
-
-  // стіни — блідими блоками, щоб читалася форма карти
-  ctx.fillStyle = 'rgba(120,140,175,.35)';
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const t = grid[r][c];
-    if (t !== T_BRICK && t !== T_STEEL) continue;
-    ctx.fillRect(mx + c * TILE * sx, my + r * TILE * sy, TILE * sx, TILE * sy);
-  }
-  const dot = (x, y, col, r2) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(mx + x * sx, my + y * sy, r2, 0, 7); ctx.fill(); };
-  // бази
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    if (grid[r][c] === T_HQ) dot(c * TILE + 20, r * TILE + 20, '#ff4d5e', 3);
-    if (grid[r][c] === T_HOME) dot(c * TILE + 20, r * TILE + 20, '#39ff88', 3);
-  }
-  for (const d of drops) dot(d.x, d.y, CRATES[d.kind] ? '#ffd23f' : '#6fd3ff', 2);
-  for (const e of enemies) if (!e.dead && !(e.spawning > 0)) dot(e.x, e.y, '#ff9d5c', 2.2);
-  for (const h of (battle.helpers || [])) if (!h.dead) dot(h.x, h.y, '#6fd3ff', 2.2);
-  dot(player.x, player.y, '#39ff88', 3);
-  // рамка того, що зараз видно на екрані
-  ctx.strokeStyle = 'rgba(57,255,136,.6)';
-  ctx.strokeRect(mx + camX * sx, my, VIEW_W * sx, mh);
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, lines * 17 + 7);
   ctx.restore();
-  ctx.globalAlpha = 1;
 
-  // статус під міні-мапою: щит штабу і активні трофеї — тут є місце,
-  // а у верхній смузі вони налазили на таймер
-  // підкладка, щоб текст читався поверх карти
-  const lines = (battle.hqLeft > 0 ? 1 : 0) + ((player.buffs && player.buffs.length) || 0);
-  if (lines) {
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = '#05070c';
-    ctx.fillRect(mx - 40, my + mh + 5, mw + 40, lines * 16 + 6);
-    ctx.restore();
-  }
-  let ly = my + mh + 14;
+  let ly = y + 13;
   ctx.save();
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -3076,15 +3164,13 @@ function drawMinimap() {
     ctx.fillStyle = battle.hqSealed ? '#6fd3ff' : '#ffd23f';
     ctx.fillText(battle.hqSealed
       ? `🛡 щит штабу ${Math.min(battle.frags, battle.sealGoal)}/${battle.sealGoal}`
-      : '☭ ШТАБ ВІДКРИТИЙ', mx + mw, ly);
-    ly += 16;
+      : '☭ ШТАБ ВІДКРИТИЙ', x + w - 8, ly);
+    ly += 17;
   }
-  if (player.buffs && player.buffs.length) {
-    ctx.fillStyle = '#ffd23f';
-    for (const b of player.buffs) {
-      ctx.fillText(`${CRATES[b.id].ico} ${CRATES[b.id].name} ${Math.ceil(b.left / 1000)}с`, mx + mw, ly);
-      ly += 15;
-    }
+  ctx.fillStyle = '#ffd23f';
+  for (const b of buffs) {
+    ctx.fillText(`${CRATES[b.id].ico} ${CRATES[b.id].name} ${Math.ceil(b.left / 1000)}с`, x + w - 8, ly);
+    ly += 17;
   }
   ctx.restore();
 }
