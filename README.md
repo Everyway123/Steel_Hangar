@@ -75,33 +75,35 @@ Lottery (could be anything).
 </td></tr>
 <tr><td>
 
-### 🛡 A round with an arc
-The enemy HQ sits behind a **steel shield** until you've broken
-half their forward group. So a round isn't a flat grind —
-it's a fight for advantage, then a breakthrough.
+### 🛡 A fortress, not a shortcut
+The enemy HQ hides behind a **steel shield** until you've broken
+half their forward group — and behind steel flanks and two
+gun emplacements after that. Meanwhile most of them are driving
+at *your* base. A round is a fight for advantage, then a siege.
 
 </td><td>
 
-### 🗺 Maps twice as wide as your screen
-The camera follows your tank; a minimap keeps the whole
-battlefield in view. Bushes hide you. Barrels chain-explode.
-Ice makes you drift. Walls take three shots, not one.
+### 🗺 One screen, packed
+No camera, no scrolling — the whole battlefield is in front of
+you, and up to thirteen enemy tanks are on it. Bushes hide you.
+Barrels chain-explode. Ice makes you drift. Walls take three
+shots, not one.
 
 </td></tr>
 <tr><td>
 
-### 🤝 Allied pilots
-A rare crate brings a friendly tank into the fight —
-60% of your health, 70% of your damage, and it draws fire.
-Find a second one and you're rolling three deep.
+### 🤝 A wingman from the first second
+An allied tank rolls out with you — 60% of your health,
+70% of your damage, and it pulls fire off you. That's what
+makes the enemy count fair. A rare crate brings a second one.
 
 </td><td>
 
-### 🎼 A soundtrack with no audio files
-Cinematic organ, generated live in WebAudio: a 4.2-second
-convolution reverb built at runtime, additive organ pipes
-instead of a sawtooth, an eighth-note ostinato and a slow
-sixteen-bar crescendo. Denser in battle than in the hangar.
+### 🎼 Six soundtracks, no audio files
+The music reads the round. Chiptune while you fight, minor and
+faster when a wave lands, chromatic dread under 32% health,
+major on the breakthrough, cinematic organ in the hangar and
+against the boss. All synthesised live; tracks swap on the bar.
 
 </td></tr>
 </table>
