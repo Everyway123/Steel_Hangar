@@ -1,9 +1,14 @@
 # Публікація гри на GitHub Pages. Збирати нічого не треба — гра це статика.
 name: Deploy to GitHub Pages
 
+# ЛИШЕ РУЧНИЙ ЗАПУСК, доки Pages не увімкнено в налаштуваннях репозиторію.
+# Автозапуск на кожен пуш давав по листу про падіння за кожен коміт:
+# actions/configure-pages не може створити сайт, бо токен воркфлоу
+# обмежений налаштуваннями репо. Коли Pages буде увімкнено
+# (Settings → Pages → Source → GitHub Actions), поверни блок push:
+#   push:
+#     branches: [main, master, claude/first-game-tyh4hr]
 on:
-  push:
-    branches: [main, master, claude/first-game-tyh4hr]
   workflow_dispatch:
 
 permissions:
