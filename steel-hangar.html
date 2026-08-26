@@ -774,12 +774,14 @@ const FRONT_SECTORS = [
   { id: 'polihon',     name: 'Полігон',           x: 21, y: 24, map: 'Полігон',              mode: 'clear',   mod: null,        reward: 400,  links: ['pisky', 'mist'] },
   { id: 'peredmistia', name: 'Передмістя',        x: 21, y: 76, map: 'Міські руїни',         mode: 'clear',   mod: null,        reward: 400,  links: ['mist', 'sklady'] },
   { id: 'pisky',       name: 'Піски',             x: 37, y: 10, map: 'Пустельний рубіж',     mode: 'clear',   mod: 'night',     reward: 700,  links: ['fort'] },
-  { id: 'mist',        name: 'Міст',              x: 37, y: 50, map: 'Річкова переправа',    mode: 'clear',   mod: 'fog',       reward: 700,  links: ['fort'] },
+  { id: 'mist',        name: 'Міст',              x: 37, y: 50, map: 'Річкова переправа',    mode: 'clear',   mod: 'fog',       reward: 700,  links: ['fort', 'oborona1'] },
+  { id: 'oborona1',    name: 'Оборона: Депо',     x: 44, y: 66, map: 'Склад боєприпасів',    mode: 'defense', mod: null,        reward: 900,  links: ['radar'] },
   { id: 'sklady',      name: 'Склади',            x: 37, y: 90, map: 'Склад боєприпасів',    mode: 'clear',   mod: 'artillery', reward: 700,  links: ['radar'] },
   { id: 'fort',        name: 'Форт «Сталь»',      x: 51, y: 28, map: 'Сталева фортеця',      mode: 'clear',   mod: 'mines',     reward: 1100, links: ['ozero', 'ksh'] },
   { id: 'radar',       name: 'Радарна база',      x: 51, y: 74, map: 'Штурм: Радарна база',  mode: 'assault', mod: 'fog',       reward: 1200, links: ['liniya'] },
   { id: 'liniya',      name: 'Лінія оборони',     x: 63, y: 88, map: 'Лінія оборони',        mode: 'assault', mod: 'artillery', reward: 1700, links: ['ksh'] },
-  { id: 'ozero',       name: 'Крижане озеро',     x: 63, y: 8,  map: 'Крижане озеро',        mode: 'clear',   mod: 'frost',     reward: 1500, links: ['kotel'] },
+  { id: 'ozero',       name: 'Крижане озеро',     x: 63, y: 8,  map: 'Крижане озеро',        mode: 'clear',   mod: 'frost',     reward: 1500, links: ['oborona2'] },
+  { id: 'oborona2',    name: 'Оборона: Переправа', x: 70, y: 22, map: 'Річкова переправа',   mode: 'defense', mod: 'frost',     reward: 2000, links: ['kotel'] },
   { id: 'kotel',       name: 'Котел',             x: 76, y: 12, map: 'Залізний хрест',       mode: 'clear',   mod: null,        reward: 1800, boss: true, links: ['zavod'] },
   { id: 'ksh',         name: 'Командний центр',   x: 71, y: 56, map: 'Штурм: Командний центр', mode: 'assault', mod: 'night',   reward: 1600, links: ['zavod'] },
   { id: 'zavod',       name: 'Танковий завод',    x: 84, y: 32, map: 'Склад боєприпасів',    mode: 'assault', mod: 'artillery', reward: 2400, links: ['tsytadel'] },
@@ -829,6 +831,8 @@ const SUPPLY_COST = 100;              // бойових очок на одне �
 const PTS = { frag: 12, dmg: 1, hqDmg: 3, base: 25 };
 const BATTLE_LIMIT_MS = 140000; // трохи більше двох хвилин — щільніший бій потребує часу
 const MAX_WAVES = 4;            // три хвилі підкріплень за бій, далі ростер скінченний
+const DEFENSE_WAVES = 5;        // «Оборона»: скільки хвиль треба вистояти
+const DEFENSE_WAVE_MS = 22000;  // і як часто вони приходять
 const PERKS = [
   // польові — прості, але відчутні
   { id: 'maroder', rar: 'common', ico: '💰', name: 'Мародер',           desc: '+60% срібла за кожен фраг до кінця бою',
@@ -1165,6 +1169,15 @@ function drumNoise(t, dur, freq, type, vol) {
   src.start(t); src.stop(t + dur);
 }
 
+// постачання і модифікатори потрібні в усіх режимах, тож винесено окремо
+function updateSupplyAndMods(dt) {
+  if (battle.pts >= SUPPLY_COST && !battle.crateOut) {
+    battle.pts -= SUPPLY_COST;
+    battle.crateOut = true;
+    dropSupplyCrate();
+  }
+}
+
 function musicStep(i, t, eighth) {
   const tr = TRACKS[music.track] || TRACKS.hangar;
   const bar = Math.floor(i / 8);
@@ -1427,7 +1440,8 @@ function startBattle(sector) {
   battle.helpers = [];
   spawnHelper();
 
-  spawnQueue = buildRoster(st.tier, elite);
+  // в обороні бій починається з порожнього поля: усе приносять хвилі
+  spawnQueue = battle.mode === 'defense' ? [] : buildRoster(st.tier, elite);
   battle.totalEnemies = spawnQueue.length;
   // штаб ☭ під сталевим щитом, доки не виб'єш половину передового загону.
   // Раунд тепер має дві фази: бій за перевагу → прорив до штабу
@@ -1435,7 +1449,7 @@ function startBattle(sector) {
   // і подовжила бої (105 с проти 86) — раніше відкритий штаб лише
   // провокує кидатись на нього крізь вогонь
   battle.sealGoal = Math.ceil(spawnQueue.length / 2);
-  battle.hqSealed = true;
+  battle.hqSealed = battle.mode !== 'defense';
   maxAlive = Math.min(13, 9 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
@@ -1654,7 +1668,9 @@ function updateEnemy(e, dt) {
     e.thinkTimer = 400 + Math.random() * 1200;
     // половина ворогів суне до ТВОЄЇ БАЗИ — не можна просто відсидітись
     const homeX = battle.homeC * TILE + TILE / 2, homeY = battle.homeR * TILE + TILE / 2;
-    const goHome = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME && Math.random() < 0.62;
+    // в обороні база — головна ціль ворога, а не побічна
+    const homeChance = battle.mode === 'defense' ? 0.85 : 0.62;
+    const goHome = grid[battle.homeR] && grid[battle.homeR][battle.homeC] === T_HOME && Math.random() < homeChance;
     // трофей поруч — ворог звертає за ним: тепер це гонка, а не безкоштовний бонус
     // за трофеєм біжить лише половина ворогів і лише зблизька:
     // інакше вони вимітають карту раніше, ніж ти встигаєш доїхати
@@ -2244,7 +2260,7 @@ function renderFront() {
     div.style.left = s.x + '%';
     div.style.top = s.y + '%';
     const modStr = s.mod ? MOD_INFO[s.mod].ico + ' ' + MOD_INFO[s.mod].name : '';
-    const modeStr = s.base ? '' : (s.mode === 'assault' ? '☭ штурм' : '⚔ зачистка') + (s.boss ? ' · ☠ БОС' : '');
+    const modeStr = s.base ? '' : (s.mode === 'assault' ? '☭ штурм' : s.mode === 'defense' ? '🛡 оборона' : '⚔ зачистка') + (s.boss ? ' · ☠ БОС' : '');
     div.innerHTML = `
       <div class="sn">${st === 'lib' ? '✅ ' : st === 'lock' ? '🔒 ' : '⚔ '}${s.name}</div>
       ${modeStr ? `<div class="sm">${modeStr}</div>` : '<div class="sm">твій тил</div>'}
@@ -3642,7 +3658,9 @@ function drawHud() {
   ctx.textAlign = 'left';
   ctx.font = 'bold 13px monospace';
   ctx.fillStyle = battle.waveFlash > 0 ? '#ff4d5e' : '#8fa2c4';
-  ctx.fillText('🌊' + battle.wave, 196, midY);
+  ctx.fillText(battle.mode === 'defense'
+    ? `🛡 ${Math.min(battle.wave, DEFENSE_WAVES)}/${DEFENSE_WAVES}`
+    : '🌊' + battle.wave, 196, midY);
 
   // праворуч: аптечка
   ctx.textAlign = 'right';
@@ -3784,14 +3802,18 @@ function drawHud() {
     ctx.font = 'bold 21px monospace';
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 16;
-    ctx.fillText('☭ ЗНИЩ ВОРОЖУ БАЗУ — ЗАХИСТИ СВОЮ ★', VIEW_W / 2, cy - 16);
+    ctx.fillText(battle.mode === 'defense'
+      ? '🛡 ОБОРОНА — БАЗА ★ МАЄ ВИСТОЯТИ'
+      : '☭ ЗНИЩ ВОРОЖУ БАЗУ — ЗАХИСТИ СВОЮ ★', VIEW_W / 2, cy - 16);
     ctx.shadowBlur = 0;
     ctx.font = '15px monospace';
     ctx.fillStyle = '#d7e0f0';
     ctx.fillText(battle.mapName + (battle.elite ? '  ·  ☠ ЕЛІТНИЙ БІЙ' : ''), VIEW_W / 2, cy + 16);
     ctx.fillStyle = '#8fa2c4';
     ctx.font = '13px monospace';
-    let sub = battle.mode === 'assault' ? 'Підкріплення йдуть — прорвися і знеси ☭ штаб' : '';
+    let sub = battle.mode === 'assault' ? 'Підкріплення йдуть — прорвися і знеси ☭ штаб'
+            : battle.mode === 'defense' ? `Утримай ★ базу ${DEFENSE_WAVES} хвиль — вони йдуть саме по неї`
+            : '';
     if (battle.mod) sub = (sub ? sub + '  ·  ' : '') + MOD_INFO[battle.mod].ico + ' ' + MOD_INFO[battle.mod].name;
     if (sub) ctx.fillText(sub, VIEW_W / 2, cy + 40);
     ctx.globalAlpha = 1;
@@ -3823,6 +3845,28 @@ function loop(now) {
 
   // ---- ХВИЛІ: кожні 40 с ворог присилає злішу хвилю ----
   battle.waveT += dt;
+  // ---- ХВИЛІ ----
+  if (battle.mode === 'defense') {
+    // в обороні хвилі — це не підкріплення, а сам зміст раунду
+    const fieldClearD = spawnQueue.length === 0 && enemies.every(e => e.dead);
+    // остання хвиля вибита — база вистояла
+    if (battle.wave > DEFENSE_WAVES && fieldClearD) { endBattle(true); return; }
+    if (battle.wave <= DEFENSE_WAVES &&
+        (battle.waveT >= DEFENSE_WAVE_MS || (fieldClearD && battle.waveT > 2000))) {
+      battle.waveT = 0;
+      // кожна хвиля більша за попередню — тиск росте лінійно й передбачувано
+      const n = 4 + battle.tank.tier + battle.wave * 2;
+      spawnQueue.push(...buildRoster(battle.tank.tier, false).slice(0, n));
+      battle.totalEnemies += n;
+      battle.waveFlash = 2400;
+      sfx.boom();
+      shakeTime = 300;
+      floatText(player.x, player.y - 46,
+        battle.wave === DEFENSE_WAVES ? `☠ ОСТАННЯ ХВИЛЯ: +${n}!` : `⚠ ХВИЛЯ ${battle.wave}/${DEFENSE_WAVES}: +${n}`,
+        '#ff4d5e');
+      battle.wave++;
+    }
+  } else {
   // поле зачищене — не змушуємо чекати таймер: наступна хвиля йде одразу
   const fieldClear = spawnQueue.length === 0 && enemies.every(e => e.dead);
   if ((battle.waveT >= 40000 || (fieldClear && battle.waveT > 2500)) && battle.wave < MAX_WAVES) {
@@ -3838,14 +3882,10 @@ function loop(now) {
     shakeTime = 250;
     floatText(player.x, player.y - 46, `⚠ ХВИЛЯ ${battle.wave}: +${reinf.length} ворогів!`, '#ff4d5e');
   }
+  }
   if (battle.waveFlash > 0) battle.waveFlash -= dt;
 
-  // ---- ПОСТАЧАННЯ: заробляється боєм, і його треба ПІДІБРАТИ ----
-  if (battle.pts >= SUPPLY_COST && !battle.crateOut) {
-    battle.pts -= SUPPLY_COST;
-    battle.crateOut = true;
-    dropSupplyCrate();
-  }
+  updateSupplyAndMods(dt);
 
   updateModifiers(dt);
   if (state !== 'play') return;
@@ -4269,7 +4309,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v29 · один екран, союзник, фортеця, музика під ситуацію';
+const GAME_VERSION = 'v30 · режим ОБОРОНА: втримай базу 5 хвиль';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

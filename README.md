@@ -75,11 +75,11 @@ Lottery (could be anything).
 </td></tr>
 <tr><td>
 
-### 🛡 A fortress, not a shortcut
-The enemy HQ hides behind a **steel shield** until you've broken
-half their forward group — and behind steel flanks and two
-gun emplacements after that. Meanwhile most of them are driving
-at *your* base. A round is a fight for advantage, then a siege.
+### 🛡 Three kinds of round
+**Clear** — kill them all. **Assault** — break through to the ☭ HQ:
+steel-shielded until you've broken half their group, then steel
+flanks and two gun emplacements. **Defense** — hold five waves,
+each bigger than the last, 85% of them driving at your ★.
 
 </td><td>
 
