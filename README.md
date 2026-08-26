@@ -18,9 +18,9 @@ No install, no account, no dependencies — one HTML file and one JS file.
 
 <div align="center">
 
-## ▶ [**PLAY IN YOUR BROWSER**](https://everyway123.github.io/game1/)
+## ▶ [**PLAY IN YOUR BROWSER**](https://everyway123.github.io/Steel_Hangar/)
 
-[![Play](https://img.shields.io/badge/▶_play_now-free-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/game1/)
+[![Play](https://img.shields.io/badge/▶_play_now-free-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/Steel_Hangar/)
 [![No dependencies](https://img.shields.io/badge/dependencies-zero-2fb7ff?style=for-the-badge&labelColor=0a0e14)](#under-the-hood)
 [![Vanilla JS](https://img.shields.io/badge/built_with-vanilla_JS-ffd23f?style=for-the-badge&labelColor=0a0e14)](#under-the-hood)
 [![MIT](https://img.shields.io/badge/license-MIT-7a8aa8?style=for-the-badge&labelColor=0a0e14)](LICENSE)
@@ -40,14 +40,14 @@ Close the tab whenever — it all saves itself.
 
 ## Play it
 
-**[everyway123.github.io/game1](https://everyway123.github.io/game1/)** — click and you're in a battle.
+**[everyway123.github.io/Steel_Hangar](https://everyway123.github.io/Steel_Hangar/)** — click and you're in a battle.
 Nothing to install, no account, no ads. Works on a phone.
 
 Or run it locally:
 
 ```bash
-git clone https://github.com/Everyway123/game1.git
-open game1/index.html          # that's it
+git clone https://github.com/Everyway123/Steel_Hangar.git
+open Steel_Hangar/index.html          # that's it
 ```
 
 No build step. No `npm install`. Open the file.
@@ -176,7 +176,7 @@ No framework, no bundler, no assets folder. The tanks are drawn with paths and g
 the explosions are particles, the reverb is a noise buffer with a power-law decay.
 
 ```
-game1/
+Steel_Hangar/
 ├── index.html      hangar UI, campaign map, overlays, styles
 ├── game.js         game loop, AI, rendering, audio, save
 └── docs/           screenshots

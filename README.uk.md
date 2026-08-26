@@ -18,9 +18,9 @@
 
 <div align="center">
 
-## ▶ [**ГРАТИ В БРАУЗЕРІ**](https://everyway123.github.io/game1/)
+## ▶ [**ГРАТИ В БРАУЗЕРІ**](https://everyway123.github.io/Steel_Hangar/)
 
-[![Грати](https://img.shields.io/badge/▶_грати-безкоштовно-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/game1/)
+[![Грати](https://img.shields.io/badge/▶_грати-безкоштовно-39ff88?style=for-the-badge&labelColor=0a0e14)](https://everyway123.github.io/Steel_Hangar/)
 [![Без залежностей](https://img.shields.io/badge/залежностей-нуль-2fb7ff?style=for-the-badge&labelColor=0a0e14)](#як-це-зроблено)
 [![Чистий JS](https://img.shields.io/badge/зроблено_на-чистому_JS-ffd23f?style=for-the-badge&labelColor=0a0e14)](#як-це-зроблено)
 [![MIT](https://img.shields.io/badge/ліцензія-MIT-7a8aa8?style=for-the-badge&labelColor=0a0e14)](LICENSE)
@@ -38,14 +38,14 @@
 
 ## Як запустити
 
-**[everyway123.github.io/game1](https://everyway123.github.io/game1/)** — тиснеш і вже в бою.
+**[everyway123.github.io/Steel_Hangar](https://everyway123.github.io/Steel_Hangar/)** — тиснеш і вже в бою.
 Нічого встановлювати, без акаунта, без реклами. Працює на телефоні.
 
 Або локально:
 
 ```bash
-git clone https://github.com/Everyway123/game1.git
-open game1/index.html          # усе
+git clone https://github.com/Everyway123/Steel_Hangar.git
+open Steel_Hangar/index.html          # усе
 ```
 
 Жодного збирання. Жодного `npm install`. Просто відкрий файл.
@@ -173,7 +173,7 @@ open game1/index.html          # усе
 вибухи — частинки, реверберація — шумовий буфер зі степеневим згасанням.
 
 ```
-game1/
+Steel_Hangar/
 ├── index.html      інтерфейс ангара, мапа фронту, оверлеї, стилі
 ├── game.js         ігровий цикл, ШІ, рендер, звук, збереження
 └── docs/           скріншоти
