@@ -394,7 +394,9 @@ const ENEMY_TYPES = {
 function buildRoster(tier, elite) {
   const pool = [];
   // щільний бій на одному екрані: ростер тримає раунд, а не закінчується за 40 с
-  const count = 22 + tier * 3;
+  // ростер має вибиватись за раунд: заміряно 0.24 фрага/с, ліміт 140 с
+  // → стеля близько 33 ворогів разом із хвилями
+  const count = 12 + tier * 2;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -419,7 +421,7 @@ function enemyFireGap() {
 const SUPPLY_COST = 100;              // бойових очок на одне постачання
 // очки за дії: фраг, урон, шкода ворожій базі — сила заробляється боєм
 const PTS = { frag: 12, dmg: 1, hqDmg: 3, base: 25 };
-const BATTLE_LIMIT_MS = 120000; // 2 хвилини — жорстка межа раунду
+const BATTLE_LIMIT_MS = 140000; // трохи більше двох хвилин — щільніший бій потребує часу
 const MAX_WAVES = 4;            // три хвилі підкріплень за бій, далі ростер скінченний
 const PERKS = [
   // польові — прості, але відчутні
@@ -1028,7 +1030,7 @@ function startBattle(sector) {
   // провокує кидатись на нього крізь вогонь
   battle.sealGoal = Math.ceil(spawnQueue.length / 2);
   battle.hqSealed = true;
-  maxAlive = Math.min(16, 11 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
+  maxAlive = Math.min(13, 9 + Math.floor(st.tier / 2)) + (elite ? 1 : 0);
   spawnTimer = 400;
   freezeTimer = 0; shakeTime = 0; pendingPerks = 0;
   keys = {};
@@ -3423,7 +3425,7 @@ function loop(now) {
     battle.waveFlash = 2200;
     // хвиля має ПРИВОДИТИ ворогів. Раніше лічильник крутився вхолосту:
     // напис «ХВИЛЯ 3» був, а підкріплення не приходило зовсім
-    const reinf = buildRoster(battle.tank.tier, false).slice(0, 3 + battle.tank.tier);
+    const reinf = buildRoster(battle.tank.tier, false).slice(0, 2 + battle.tank.tier);
     spawnQueue.push(...reinf);
     battle.totalEnemies += reinf.length;
     sfx.boom();
