@@ -29,35 +29,62 @@
   h1, h2 { letter-spacing: 2px; }
 
   /* ======== АНГАР ======== */
-  #hangarView { width: 100%; max-width: 960px; }
+  /* Увесь ангар живе в одному екрані: чотири рядки сітки, прокрутка —
+     тільки всередині нижніх панелей, сама сторінка не скролиться. */
+  #hangarView {
+    /* мінус padding самого body — інакше сторінка переливається рівно на нього */
+    width: 100%; max-width: 1180px; height: calc(100dvh - 20px);
+    display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px;
+  }
   #hangarHead {
     display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
     background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
-    padding: 12px 18px; margin-bottom: 12px;
+    padding: 9px 16px;
   }
-  #hangarHead h1 { font-size: 20px; color: var(--neon); text-shadow: 0 0 10px rgba(57,255,136,.5); }
-  #hangarHead .res { display: flex; gap: 18px; font-size: 15px; }
+  #hangarHead h1 { font-size: 18px; color: var(--neon); text-shadow: 0 0 10px rgba(57,255,136,.5); }
+  #hangarHead .res { display: flex; gap: 16px; font-size: 14px; }
   #hangarHead .res b { color: var(--gold); }
-  #hangarMain { display: flex; gap: 12px; flex-wrap: wrap; }
-  #treeCol { flex: 1 1 380px; }
-  #detailCol { flex: 1 1 380px; }
+  #hangarMain { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 0; }
   .box {
     background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
-    padding: 14px; margin-bottom: 12px;
+    padding: 12px;
   }
-  .box h2 { font-size: 15px; color: var(--blue); margin-bottom: 10px; }
-  .tankNode {
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  .box h2 { font-size: 14px; color: var(--blue); margin-bottom: 8px; }
+  .box h2 .hint { color: var(--dim); font-size: 11px; letter-spacing: 0; }
+  /* панелі прокручуються самі, а не тягнуть сторінку вниз */
+  .pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .pane > #tankStats, .tabBody { overflow-y: auto; min-height: 0; flex: 1; }
+  #detailTop { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+  #tankAction { flex: 1; font-size: 12px; }
+  #treeBox { padding: 10px 12px; }
+
+  /* ДЕРЕВО: чотири гілки — чотири горизонтальні рядки, усе видно одразу */
+  .branchRow { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .branchName {
+    flex: 0 0 88px; color: var(--dim); font-size: 11px; text-align: right;
+    padding-right: 6px; border-right: 1px dashed var(--border);
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+  .chip {
     background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 9px 12px; margin-bottom: 7px; cursor: pointer;
+    padding: 5px 9px; cursor: pointer; min-width: 108px; line-height: 1.25;
   }
-  .tankNode:hover { border-color: var(--blue); }
-  .tankNode.sel { border-color: var(--neon); box-shadow: 0 0 8px rgba(57,255,136,.3); }
-  .tankNode.locked { opacity: .55; }
-  .tankNode .tn { font-size: 14px; }
-  .tankNode .cls { font-size: 11px; color: var(--dim); }
-  .tankNode .badge { font-size: 11px; color: var(--gold); white-space: nowrap; }
-  .branchLabel { color: var(--dim); font-size: 11px; margin: 10px 0 5px; border-top: 1px dashed var(--border); padding-top: 8px; }
+  .chip:hover { border-color: var(--blue); }
+  .chip.sel { border-color: var(--neon); box-shadow: 0 0 8px rgba(57,255,136,.3); }
+  .chip.locked { opacity: .45; }
+  .chip.buy { border-color: var(--gold); }
+  .chip .tn { font-size: 12px; }
+  .chip .badge { font-size: 10px; color: var(--gold); display: block; }
+  .chip .badge.dim { color: var(--dim); }
+
+  /* ВКЛАДКИ праворуч замість трьох панелей одна під одною */
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .tab {
+    flex: 1; background: transparent; border: 1px solid var(--border); color: var(--dim);
+    font-family: inherit; font-size: 11px; padding: 6px 4px; border-radius: 5px; cursor: pointer;
+  }
+  .tab:hover { border-color: var(--blue); color: var(--blue); }
+  .tab.on { border-color: var(--neon); color: var(--neon); }
   .statRow { display: flex; justify-content: space-between; margin: 4px 0; font-size: 14px; }
   .statRow .val { color: var(--gold); }
   .modRow {
@@ -79,12 +106,13 @@
   .btn.danger { border-color: var(--danger); color: var(--danger); }
   .btn.danger:hover:not(:disabled) { background: var(--danger); color: #05070c; }
   #battleBtn {
-    width: 100%; font-size: 20px; padding: 14px;
+    width: 100%; font-size: 19px; padding: 11px;
     text-shadow: 0 0 8px rgba(255,210,63,.5);
   }
+  #hangarBottom { display: flex; flex-direction: column; gap: 5px; }
   #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
-  #hangarFoot { text-align: center; color: var(--dim); font-size: 11px; margin-top: 4px; }
+  #hangarFoot { text-align: center; color: var(--dim); font-size: 11px; }
 
   /* ======== БІЙ ======== */
   #battleView { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
@@ -243,21 +271,28 @@
     #hangarHead { padding: 10px 12px; }
     #hangarHead h1 { font-size: 17px; }
     #hangarHead .res { gap: 10px; font-size: 13px; flex-wrap: wrap; }
-    #hangarMain { flex-direction: column; }
-    #treeCol, #detailCol { flex: 1 1 100%; }
-    /* спершу твій танк і модулі, гілка досліджень — нижче */
-    #detailCol { order: -1; }
+    /* На телефоні жорстка сітка у 100dvh лише ріже вміст: тут сторінка
+       нормально скролиться, а «У БІЙ» усе одно прибитий до низу екрана. */
+    #hangarView { height: auto; display: block; }
+    #hangarHead, #treeBox, #hangarMain { margin-bottom: 9px; }
+    #hangarMain { display: block; }
+    .pane { overflow: visible; margin-bottom: 9px; }
+    .pane > #tankStats, .tabBody { overflow: visible; }
+    /* спершу твій танк і модулі, дерево — нижче */
+    #hangarMain { order: -1; }
+    #detailTop { flex-direction: column; align-items: flex-start; }
+    .branchRow { flex-direction: column; align-items: stretch; gap: 4px; }
+    .branchName { flex: none; text-align: left; border-right: 0; border-bottom: 1px dashed var(--border); padding: 0 0 3px; }
+    .chip { min-width: 0; flex: 1 1 46%; padding: 9px 10px; }   /* палець влучає */
+    .chip .tn { font-size: 13px; }
+    .tab { padding: 9px 4px; font-size: 12px; }
     /* «У БІЙ» завжди під великим пальцем, а не в кінці довгого списку */
     body:not(.inBattle) { padding-bottom: 88px; }
-    #battleBox { padding: 0; margin: 0; border: 0; background: none; }
     body:not(.inBattle) #battleBtn {
       position: fixed; left: 8px; right: 8px; bottom: 8px; width: auto; z-index: 12;
       background: #0d1420; box-shadow: 0 6px 26px 10px rgba(4,7,13,.95);
     }
-    .box { padding: 11px; margin-bottom: 9px; }
-    .tankNode { padding: 12px 12px; }        /* палець влучає */
-    .tankNode .tn { font-size: 15px; }
-    .tankNode .badge { font-size: 11px; }
+    .box { padding: 11px; }
     .modRow { padding: 11px 10px; font-size: 13px; }
     .modRow .btn { padding: 9px 12px; font-size: 12px; }
     .btn { padding: 11px 16px; font-size: 15px; }
@@ -304,46 +339,44 @@
     <h1>⚙ СТАЛЕВИЙ АНГАР</h1>
     <div class="res">
       <span>🪙 <b id="uiCredits">0</b></span>
+      <span title="Вільний досвід: витрачається на будь-яке дослідження">⭐ Вільний: <b id="uiFreeXp">0</b></span>
       <span>⚔ Боїв: <b id="uiBattles">0</b></span>
       <span>🏆 Перемог: <b id="uiWins">0</b></span>
     </div>
   </div>
+  <div class="box" id="treeBox">
+    <h2>🌳 ДЕРЕВО ДОСЛІДЖЕНЬ <span class="hint">натисни танк — обрати, дослідити або купити</span></h2>
+    <div id="treeList"></div>
+  </div>
   <div id="hangarMain">
-    <div id="treeCol">
-      <div class="box">
-        <h2>🌳 ГІЛКА ДОСЛІДЖЕНЬ</h2>
-        <div id="treeList"></div>
-      </div>
-      <div class="box">
-        <h2>🎁 КОДЕКС ТРОФЕЇВ <span style="color:var(--dim);font-size:11px" id="codexCount"></span></h2>
-        <div id="codexList"></div>
-      </div>
-      <div class="box">
-        <h2>📊 АНАЛІТИКА <span style="color:var(--dim);font-size:11px">(рахується автоматично з твоїх боїв)</span></h2>
-        <div id="statsContent"></div>
-      </div>
-    </div>
-    <div id="detailCol">
-      <div class="box">
-        <h2 id="tankTitle">ТАНК</h2>
+    <div class="box pane" id="detailBox">
+      <h2 id="tankTitle">ТАНК</h2>
+      <div id="detailTop">
         <canvas id="tankPreview" width="180" height="110"></canvas>
-        <div id="tankStats"></div>
+        <div id="tankAction"></div>
       </div>
-      <div class="box">
-        <h2>🔧 МОДУЛІ <span style="color:var(--dim);font-size:11px">(покращення купуються за срібло)</span></h2>
-        <div id="modList"></div>
+      <div id="tankStats"></div>
+    </div>
+    <div class="box pane" id="sideBox">
+      <div class="tabs">
+        <button class="tab on" data-tab="mod">🔧 МОДУЛІ</button>
+        <button class="tab" data-tab="codex">🎁 КОДЕКС <span id="codexCount"></span></button>
+        <button class="tab" data-tab="stats">📊 АНАЛІТИКА</button>
       </div>
-      <div class="box" id="battleBox">
-        <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
-      </div>
+      <div class="tabBody" id="tab-mod"><div id="modList"></div></div>
+      <div class="tabBody hidden" id="tab-codex"><div id="codexList"></div></div>
+      <div class="tabBody hidden" id="tab-stats"><div id="statsContent"></div></div>
     </div>
   </div>
-  <div id="hangarFoot">
-    <span id="verTag" style="color:var(--neon)"></span> · Прогрес зберігається автоматично ·
-    <button class="btn small" id="musicBtn">🎵 музика [M]</button>
-    <button class="btn small" id="logBtn">📊 лог боїв</button>
-    <button class="btn small" id="logClearBtn">очистити лог</button>
-    <button class="btn danger small" id="resetBtn">скинути прогрес</button>
+  <div id="hangarBottom">
+    <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
+    <div id="hangarFoot">
+      <span id="verTag" style="color:var(--neon)"></span> · прогрес зберігається сам ·
+      <button class="btn small" id="musicBtn">🎵 музика [M]</button>
+      <button class="btn small" id="logBtn">📊 лог</button>
+      <button class="btn small" id="logClearBtn">очистити лог</button>
+      <button class="btn danger small" id="resetBtn">скинути прогрес</button>
+    </div>
   </div>
 </div>
 
@@ -469,6 +502,14 @@ function crewNextXp(lvl) { return (lvl + 1) * (lvl + 1) * 120; }
 
 function isElite(ts) { return Object.keys(MODULES).every(k => (ts.modules[k] || 0) >= MOD_MAX); }
 
+// Чи лишилось на цьому танку що досліджувати далі по гілці.
+// Привид, Шквал, Титан і Аспід стоять у кінці своїх гілок: з них не веде нікуди.
+// Без цієї перевірки досвід, зароблений на них, просто зникав.
+function hasOpenResearch(id) {
+  return Object.keys(TANKS).some(k => TANKS[k].prev === id && !tankSave(k).researched);
+}
+function isBranchEnd(id) { return !Object.keys(TANKS).some(k => TANKS[k].prev === id); }
+
 // Реальні характеристики танка: база × модулі × екіпаж
 function tankStats(id) {
   const t = TANKS[id], ts = tankSave(id), m = ts.modules;
@@ -517,6 +558,7 @@ let save;
 function defaultSave() {
   return {
     credits: 500,
+    freeXp: 0,
     battles: 0, wins: 0, totalFrags: 0,
     current: 'kadet',
     tanks: { kadet: { researched: true, owned: true, xp: 0, modules: { gun: 0, armor: 0, engine: 0 } } },
@@ -534,6 +576,7 @@ function loadSave() {
     k.researched = true; k.owned = true;
     if (!save.front) save.front = { level: 1, liberated: ['plazdarm'] };
     if (!Array.isArray(save.codex)) save.codex = [];
+    if (typeof save.freeXp !== 'number') save.freeXp = 0;
   } catch (e) { save = defaultSave(); }
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
@@ -2158,7 +2201,13 @@ function endBattle(victory) {
   const xpEarned = Math.round((battle.xp + (victory ? 120 * battle.tank.tier : 0)) * mult * (1 + sectorXp));
 
   save.credits += creditsEarned;
-  tankSave(save.current).xp += xpEarned;
+  // Якщо з поточного танка вже нема куди досліджувати (кінець гілки або все
+  // відкрито), його досвід ішов у нікуди — заміряно 9833 ⭐ за 12 боїв на
+  // Привиді. Тепер такий досвід іде у ВІЛЬНИЙ і працює на будь-яке дослідження.
+  const xpToFree = !hasOpenResearch(save.current);
+  if (xpToFree) save.freeXp += xpEarned;
+  else tankSave(save.current).xp += xpEarned;
+  battle.xpToFree = xpToFree;
   tankSave(save.current).crewXp += Math.round(xpEarned * 1.6); // екіпаж — окрема смуга, не з'їдає дерево
   save.battles++;
   if (victory) save.wins++;
@@ -2191,7 +2240,7 @@ function endBattle(victory) {
     <tr><td>Завдано урону</td><td>${Math.round(battle.dmgDealt)}</td></tr>
     <tr><td>Рикошети</td><td>${battle.ricochets}</td></tr>
     <tr><td>Срібло</td><td>+${creditsEarned} 🪙</td></tr>
-    <tr><td>Досвід танка</td><td>+${xpEarned} ⭐</td></tr>`;
+    <tr><td>${xpToFree ? 'Вільний досвід 🏁' : 'Досвід танка'}</td><td>+${xpEarned} ⭐</td></tr>`;
   document.getElementById('medals').innerHTML =
     (sectorMsg ? `<div style="color:var(--neon);margin-bottom:6px">${sectorMsg}</div>` : '') + medals.join('<br>');
   document.getElementById('resultOverlay').classList.remove('hidden');
@@ -3910,52 +3959,74 @@ function fmt(n) { return n.toLocaleString('uk-UA'); }
 
 function renderHangar() {
   document.getElementById('uiCredits').textContent = fmt(save.credits);
+  document.getElementById('uiFreeXp').textContent = fmt(save.freeXp || 0);
   document.getElementById('uiBattles').textContent = save.battles;
   document.getElementById('uiWins').textContent = save.wins;
 
-  // дерево
+  // ДЕРЕВО. Раніше це був стовпчик із 14 великих рядків — сам по собі довший
+  // за екран. Тепер кожна гілка — свій горизонтальний рядок компактних чіпів,
+  // тож усе дерево видно одразу і ангар влазить в один екран.
   const list = document.getElementById('treeList');
   list.innerHTML = '';
-  let lastBranch = '';
-  for (const id of TREE_ORDER) {
-    const t = TANKS[id], ts = tankSave(id);
-    const branch = BRANCH_LABEL[t.cls];
-    if (branch !== lastBranch) {
-      lastBranch = branch;
-      const lb = document.createElement('div');
-      lb.className = 'branchLabel';
-      lb.textContent = branch;
-      list.appendChild(lb);
+  for (const cls of ['ЛТ', 'СТ', 'ВТ', 'ПТ']) {
+    const row = document.createElement('div');
+    row.className = 'branchRow';
+    const nm = document.createElement('div');
+    nm.className = 'branchName';
+    // гілки ВТ і ПТ ростуть із чужого рядка — інакше по смузі не видно, звідки
+    const first = TREE_ORDER.find(k => TANKS[k].cls === cls);
+    const root = TANKS[first].prev;
+    nm.innerHTML = BRANCH_LABEL[cls].replace(/\s*\(.*\)/, '') +
+      (root && TANKS[root].cls !== cls
+        ? `<br><span style="font-size:10px">↳ з ${TANKS[root].name.replace(/\s*«.*»/, '')}</span>` : '');
+    row.appendChild(nm);
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    for (const id of TREE_ORDER) {
+      const t = TANKS[id];
+      if (t.cls !== cls) continue;
+      chips.appendChild(makeChip(id));
     }
-    const node = document.createElement('div');
-    node.className = 'tankNode' + (id === save.current ? ' sel' : '');
-    const prevOwned = !t.prev || tankSave(t.prev).owned;
-    let badge = '', locked = false;
-
-    if (ts.owned) {
-      badge = id === save.current ? '✅ ОБРАНО' : 'В ангарі · натисни щоб обрати';
-    } else if (ts.researched) {
-      badge = `Купити за ${fmt(t.cost)} 🪙`;
-    } else if (prevOwned) {
-      const prevXp = tankSave(t.prev).xp;
-      badge = `Дослідити: ${fmt(prevXp)}/${fmt(t.research)} ⭐ (${TANKS[t.prev].name.split(' ')[0]})`;
-    } else {
-      badge = '🔒 спочатку попередній танк';
-      locked = true;
-    }
-    if (locked) node.classList.add('locked');
-    node.innerHTML = `
-      <div>
-        <div class="tn" style="color:${CLS_COLOR[t.cls]}">${t.name}</div>
-        <div class="cls">${t.cls} · Тір ${t.tier}</div>
-      </div>
-      <div class="badge">${badge}</div>`;
-    node.onclick = () => tankNodeClick(id);
-    list.appendChild(node);
+    row.appendChild(chips);
+    list.appendChild(row);
   }
 
   renderTankDetail();
   renderAnalytics();
+}
+
+// Один чіп дерева: назва, тір і короткий статус. Довгі пояснення живуть
+// у панелі танка — у чіпі має лишатись тільки те, що читається з розгону.
+function makeChip(id) {
+  const t = TANKS[id], ts = tankSave(id);
+  const prevOwned = !t.prev || tankSave(t.prev).owned;
+  const node = document.createElement('div');
+  let cls = 'chip', badge = '', dim = false;
+
+  if (ts.owned) {
+    if (id === save.current) { cls += ' sel'; badge = '✅ обрано'; }
+    else { badge = 'в ангарі'; dim = true; }
+  } else if (ts.researched) {
+    cls += ' buy';
+    badge = `купити ${fmt(t.cost)} 🪙`;
+  } else if (prevOwned) {
+    const have = tankSave(t.prev).xp + save.freeXp;
+    badge = `${fmt(have)}/${fmt(t.research)} ⭐`;
+    dim = have < t.research;
+  } else {
+    cls += ' locked';
+    // просто замок не каже, куди йти: називаємо танк, який треба відкрити
+    badge = '🔒 ' + TANKS[t.prev].name.replace(/\s*«.*»/, '');
+    dim = true;
+  }
+  node.className = cls;
+  // 🏁 стоїть у назві, а не в статусі: кінець гілки треба бачити ДО покупки
+  node.innerHTML =
+    `<div class="tn" style="color:${CLS_COLOR[t.cls]}">${t.name.replace(/\s*«.*»/, '')} <span style="color:var(--dim)">т${t.tier}</span>${isBranchEnd(id) ? ' 🏁' : ''}</div>` +
+    `<span class="badge${dim ? ' dim' : ''}">${badge}</span>`;
+  node.title = t.name + ' · ' + t.cls + ' · Тір ' + t.tier + (isBranchEnd(id) ? ' · кінець гілки' : '');
+  node.onclick = () => tankNodeClick(id);
+  return node;
 }
 
 // ---------- Аналітика: сама рахує статистику з локального логу ----------
@@ -4036,15 +4107,21 @@ function tankNodeClick(id) {
   const prevOwned = !t.prev || tankSave(t.prev).owned;
   if (!prevOwned) { flashMsg('Спочатку відкрий попередній танк у гілці.'); return; }
   const prevTs = tankSave(t.prev);
-  if (prevTs.xp >= t.research) {
-    prevTs.xp -= t.research;
+  // спершу витрачаємо досвід самого танка, нестачу добираємо з вільного
+  if (prevTs.xp + save.freeXp >= t.research) {
+    const fromTank = Math.min(prevTs.xp, t.research);
+    prevTs.xp -= fromTank;
+    const fromFree = t.research - fromTank;
+    save.freeXp -= fromFree;
     ts.researched = true;
     persist();
     sfx.perk();
-    flashMsg(`Досліджено: ${t.name}! Тепер купи його за срібло.`);
+    flashMsg(`Досліджено: ${t.name}!` + (fromFree ? ` (${fmt(fromFree)} ⭐ з вільного)` : '') + ' Тепер купи його за срібло.');
     renderHangar();
   } else {
-    flashMsg(`Треба ще ${fmt(t.research - prevTs.xp)} ⭐ досвіду на ${TANKS[t.prev].name}. Грай на ньому в боях!`);
+    const need = t.research - prevTs.xp - save.freeXp;
+    flashMsg(`Треба ще ${fmt(need)} ⭐ на ${TANKS[t.prev].name}` +
+      (save.freeXp ? ` (вільного ${fmt(save.freeXp)} ⭐ уже враховано)` : '') + '. Грай на ньому в боях!');
   }
 }
 
@@ -4067,6 +4144,24 @@ function renderTankDetail() {
     <div class="statRow"><span>📡 Бонус срібла</span><span class="val">+${Math.round(st.radioBonus * 100)}%</span></div>
     <div class="statRow"><span>⭐ Досвід танка</span><span class="val">${fmt(ts.xp)}</span></div>
     <p style="color:var(--dim);font-size:11px;margin-top:6px">Екіпаж росте з кожним боєм: +1.5% урону і швидкості, −1% перезарядки за рівень. Усі модулі 5/5 → танк стає ЕЛІТНИМ (+10% срібла).</p>`;
+
+  // Що робити далі саме з цим танком — те, що вже не влазить у чіп дерева.
+  const nexts = Object.keys(TANKS).filter(k => TANKS[k].prev === id);
+  const open = nexts.filter(k => !tankSave(k).researched);
+  let act;
+  if (!nexts.length) {
+    act = `<span style="color:var(--gold)">🏁 кінець гілки.</span> Досвід із боїв іде у <b>вільний</b> — його можна витратити на будь-яке дослідження.`;
+  } else if (!open.length) {
+    act = `Уся гілка звідси вже досліджена — досвід іде у <b>вільний</b>.`;
+  } else {
+    act = 'Далі по гілці: ' + open.map(k => {
+      const have = ts.xp + save.freeXp, need = TANKS[k].research;
+      return `<br><span style="color:${CLS_COLOR[TANKS[k].cls]}">${TANKS[k].name.replace(/\s*«.*»/, '')}</span> — ` +
+        (have >= need ? '<span style="color:var(--neon)">можна досліджувати</span>'
+                      : `ще ${fmt(need - have)} ⭐`);
+    }).join('');
+  }
+  document.getElementById('tankAction').innerHTML = act;
 
   drawPreview(st);
 
@@ -4196,6 +4291,15 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
 
 document.getElementById('battleBtn').onclick = () => { startMusic(); showFront(); };
+
+// вкладки правої панелі: модулі / кодекс / аналітика
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.onclick = () => {
+    for (const b of document.querySelectorAll('.tab')) b.classList.toggle('on', b === tab);
+    for (const body of document.querySelectorAll('.tabBody'))
+      body.classList.toggle('hidden', body.id !== 'tab-' + tab.dataset.tab);
+  };
+}
 document.getElementById('freeBattleBtn').onclick = () => { startMusic(); startBattle(null); };
 document.getElementById('backHangarBtn').onclick = frontToHangar;
 document.getElementById('resumeBtn').onclick = resumeGame;
@@ -4309,7 +4413,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v30 · режим ОБОРОНА: втримай базу 5 хвиль';
+const GAME_VERSION = 'v31 · ангар в один екран + вільний досвід';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

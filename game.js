@@ -63,6 +63,14 @@ function crewNextXp(lvl) { return (lvl + 1) * (lvl + 1) * 120; }
 
 function isElite(ts) { return Object.keys(MODULES).every(k => (ts.modules[k] || 0) >= MOD_MAX); }
 
+// Чи лишилось на цьому танку що досліджувати далі по гілці.
+// Привид, Шквал, Титан і Аспід стоять у кінці своїх гілок: з них не веде нікуди.
+// Без цієї перевірки досвід, зароблений на них, просто зникав.
+function hasOpenResearch(id) {
+  return Object.keys(TANKS).some(k => TANKS[k].prev === id && !tankSave(k).researched);
+}
+function isBranchEnd(id) { return !Object.keys(TANKS).some(k => TANKS[k].prev === id); }
+
 // Реальні характеристики танка: база × модулі × екіпаж
 function tankStats(id) {
   const t = TANKS[id], ts = tankSave(id), m = ts.modules;
@@ -111,6 +119,7 @@ let save;
 function defaultSave() {
   return {
     credits: 500,
+    freeXp: 0,
     battles: 0, wins: 0, totalFrags: 0,
     current: 'kadet',
     tanks: { kadet: { researched: true, owned: true, xp: 0, modules: { gun: 0, armor: 0, engine: 0 } } },
@@ -128,6 +137,7 @@ function loadSave() {
     k.researched = true; k.owned = true;
     if (!save.front) save.front = { level: 1, liberated: ['plazdarm'] };
     if (!Array.isArray(save.codex)) save.codex = [];
+    if (typeof save.freeXp !== 'number') save.freeXp = 0;
   } catch (e) { save = defaultSave(); }
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
@@ -1752,7 +1762,13 @@ function endBattle(victory) {
   const xpEarned = Math.round((battle.xp + (victory ? 120 * battle.tank.tier : 0)) * mult * (1 + sectorXp));
 
   save.credits += creditsEarned;
-  tankSave(save.current).xp += xpEarned;
+  // Якщо з поточного танка вже нема куди досліджувати (кінець гілки або все
+  // відкрито), його досвід ішов у нікуди — заміряно 9833 ⭐ за 12 боїв на
+  // Привиді. Тепер такий досвід іде у ВІЛЬНИЙ і працює на будь-яке дослідження.
+  const xpToFree = !hasOpenResearch(save.current);
+  if (xpToFree) save.freeXp += xpEarned;
+  else tankSave(save.current).xp += xpEarned;
+  battle.xpToFree = xpToFree;
   tankSave(save.current).crewXp += Math.round(xpEarned * 1.6); // екіпаж — окрема смуга, не з'їдає дерево
   save.battles++;
   if (victory) save.wins++;
@@ -1785,7 +1801,7 @@ function endBattle(victory) {
     <tr><td>Завдано урону</td><td>${Math.round(battle.dmgDealt)}</td></tr>
     <tr><td>Рикошети</td><td>${battle.ricochets}</td></tr>
     <tr><td>Срібло</td><td>+${creditsEarned} 🪙</td></tr>
-    <tr><td>Досвід танка</td><td>+${xpEarned} ⭐</td></tr>`;
+    <tr><td>${xpToFree ? 'Вільний досвід 🏁' : 'Досвід танка'}</td><td>+${xpEarned} ⭐</td></tr>`;
   document.getElementById('medals').innerHTML =
     (sectorMsg ? `<div style="color:var(--neon);margin-bottom:6px">${sectorMsg}</div>` : '') + medals.join('<br>');
   document.getElementById('resultOverlay').classList.remove('hidden');
@@ -3504,52 +3520,74 @@ function fmt(n) { return n.toLocaleString('uk-UA'); }
 
 function renderHangar() {
   document.getElementById('uiCredits').textContent = fmt(save.credits);
+  document.getElementById('uiFreeXp').textContent = fmt(save.freeXp || 0);
   document.getElementById('uiBattles').textContent = save.battles;
   document.getElementById('uiWins').textContent = save.wins;
 
-  // дерево
+  // ДЕРЕВО. Раніше це був стовпчик із 14 великих рядків — сам по собі довший
+  // за екран. Тепер кожна гілка — свій горизонтальний рядок компактних чіпів,
+  // тож усе дерево видно одразу і ангар влазить в один екран.
   const list = document.getElementById('treeList');
   list.innerHTML = '';
-  let lastBranch = '';
-  for (const id of TREE_ORDER) {
-    const t = TANKS[id], ts = tankSave(id);
-    const branch = BRANCH_LABEL[t.cls];
-    if (branch !== lastBranch) {
-      lastBranch = branch;
-      const lb = document.createElement('div');
-      lb.className = 'branchLabel';
-      lb.textContent = branch;
-      list.appendChild(lb);
+  for (const cls of ['ЛТ', 'СТ', 'ВТ', 'ПТ']) {
+    const row = document.createElement('div');
+    row.className = 'branchRow';
+    const nm = document.createElement('div');
+    nm.className = 'branchName';
+    // гілки ВТ і ПТ ростуть із чужого рядка — інакше по смузі не видно, звідки
+    const first = TREE_ORDER.find(k => TANKS[k].cls === cls);
+    const root = TANKS[first].prev;
+    nm.innerHTML = BRANCH_LABEL[cls].replace(/\s*\(.*\)/, '') +
+      (root && TANKS[root].cls !== cls
+        ? `<br><span style="font-size:10px">↳ з ${TANKS[root].name.replace(/\s*«.*»/, '')}</span>` : '');
+    row.appendChild(nm);
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    for (const id of TREE_ORDER) {
+      const t = TANKS[id];
+      if (t.cls !== cls) continue;
+      chips.appendChild(makeChip(id));
     }
-    const node = document.createElement('div');
-    node.className = 'tankNode' + (id === save.current ? ' sel' : '');
-    const prevOwned = !t.prev || tankSave(t.prev).owned;
-    let badge = '', locked = false;
-
-    if (ts.owned) {
-      badge = id === save.current ? '✅ ОБРАНО' : 'В ангарі · натисни щоб обрати';
-    } else if (ts.researched) {
-      badge = `Купити за ${fmt(t.cost)} 🪙`;
-    } else if (prevOwned) {
-      const prevXp = tankSave(t.prev).xp;
-      badge = `Дослідити: ${fmt(prevXp)}/${fmt(t.research)} ⭐ (${TANKS[t.prev].name.split(' ')[0]})`;
-    } else {
-      badge = '🔒 спочатку попередній танк';
-      locked = true;
-    }
-    if (locked) node.classList.add('locked');
-    node.innerHTML = `
-      <div>
-        <div class="tn" style="color:${CLS_COLOR[t.cls]}">${t.name}</div>
-        <div class="cls">${t.cls} · Тір ${t.tier}</div>
-      </div>
-      <div class="badge">${badge}</div>`;
-    node.onclick = () => tankNodeClick(id);
-    list.appendChild(node);
+    row.appendChild(chips);
+    list.appendChild(row);
   }
 
   renderTankDetail();
   renderAnalytics();
+}
+
+// Один чіп дерева: назва, тір і короткий статус. Довгі пояснення живуть
+// у панелі танка — у чіпі має лишатись тільки те, що читається з розгону.
+function makeChip(id) {
+  const t = TANKS[id], ts = tankSave(id);
+  const prevOwned = !t.prev || tankSave(t.prev).owned;
+  const node = document.createElement('div');
+  let cls = 'chip', badge = '', dim = false;
+
+  if (ts.owned) {
+    if (id === save.current) { cls += ' sel'; badge = '✅ обрано'; }
+    else { badge = 'в ангарі'; dim = true; }
+  } else if (ts.researched) {
+    cls += ' buy';
+    badge = `купити ${fmt(t.cost)} 🪙`;
+  } else if (prevOwned) {
+    const have = tankSave(t.prev).xp + save.freeXp;
+    badge = `${fmt(have)}/${fmt(t.research)} ⭐`;
+    dim = have < t.research;
+  } else {
+    cls += ' locked';
+    // просто замок не каже, куди йти: називаємо танк, який треба відкрити
+    badge = '🔒 ' + TANKS[t.prev].name.replace(/\s*«.*»/, '');
+    dim = true;
+  }
+  node.className = cls;
+  // 🏁 стоїть у назві, а не в статусі: кінець гілки треба бачити ДО покупки
+  node.innerHTML =
+    `<div class="tn" style="color:${CLS_COLOR[t.cls]}">${t.name.replace(/\s*«.*»/, '')} <span style="color:var(--dim)">т${t.tier}</span>${isBranchEnd(id) ? ' 🏁' : ''}</div>` +
+    `<span class="badge${dim ? ' dim' : ''}">${badge}</span>`;
+  node.title = t.name + ' · ' + t.cls + ' · Тір ' + t.tier + (isBranchEnd(id) ? ' · кінець гілки' : '');
+  node.onclick = () => tankNodeClick(id);
+  return node;
 }
 
 // ---------- Аналітика: сама рахує статистику з локального логу ----------
@@ -3630,15 +3668,21 @@ function tankNodeClick(id) {
   const prevOwned = !t.prev || tankSave(t.prev).owned;
   if (!prevOwned) { flashMsg('Спочатку відкрий попередній танк у гілці.'); return; }
   const prevTs = tankSave(t.prev);
-  if (prevTs.xp >= t.research) {
-    prevTs.xp -= t.research;
+  // спершу витрачаємо досвід самого танка, нестачу добираємо з вільного
+  if (prevTs.xp + save.freeXp >= t.research) {
+    const fromTank = Math.min(prevTs.xp, t.research);
+    prevTs.xp -= fromTank;
+    const fromFree = t.research - fromTank;
+    save.freeXp -= fromFree;
     ts.researched = true;
     persist();
     sfx.perk();
-    flashMsg(`Досліджено: ${t.name}! Тепер купи його за срібло.`);
+    flashMsg(`Досліджено: ${t.name}!` + (fromFree ? ` (${fmt(fromFree)} ⭐ з вільного)` : '') + ' Тепер купи його за срібло.');
     renderHangar();
   } else {
-    flashMsg(`Треба ще ${fmt(t.research - prevTs.xp)} ⭐ досвіду на ${TANKS[t.prev].name}. Грай на ньому в боях!`);
+    const need = t.research - prevTs.xp - save.freeXp;
+    flashMsg(`Треба ще ${fmt(need)} ⭐ на ${TANKS[t.prev].name}` +
+      (save.freeXp ? ` (вільного ${fmt(save.freeXp)} ⭐ уже враховано)` : '') + '. Грай на ньому в боях!');
   }
 }
 
@@ -3661,6 +3705,24 @@ function renderTankDetail() {
     <div class="statRow"><span>📡 Бонус срібла</span><span class="val">+${Math.round(st.radioBonus * 100)}%</span></div>
     <div class="statRow"><span>⭐ Досвід танка</span><span class="val">${fmt(ts.xp)}</span></div>
     <p style="color:var(--dim);font-size:11px;margin-top:6px">Екіпаж росте з кожним боєм: +1.5% урону і швидкості, −1% перезарядки за рівень. Усі модулі 5/5 → танк стає ЕЛІТНИМ (+10% срібла).</p>`;
+
+  // Що робити далі саме з цим танком — те, що вже не влазить у чіп дерева.
+  const nexts = Object.keys(TANKS).filter(k => TANKS[k].prev === id);
+  const open = nexts.filter(k => !tankSave(k).researched);
+  let act;
+  if (!nexts.length) {
+    act = `<span style="color:var(--gold)">🏁 кінець гілки.</span> Досвід із боїв іде у <b>вільний</b> — його можна витратити на будь-яке дослідження.`;
+  } else if (!open.length) {
+    act = `Уся гілка звідси вже досліджена — досвід іде у <b>вільний</b>.`;
+  } else {
+    act = 'Далі по гілці: ' + open.map(k => {
+      const have = ts.xp + save.freeXp, need = TANKS[k].research;
+      return `<br><span style="color:${CLS_COLOR[TANKS[k].cls]}">${TANKS[k].name.replace(/\s*«.*»/, '')}</span> — ` +
+        (have >= need ? '<span style="color:var(--neon)">можна досліджувати</span>'
+                      : `ще ${fmt(need - have)} ⭐`);
+    }).join('');
+  }
+  document.getElementById('tankAction').innerHTML = act;
 
   drawPreview(st);
 
@@ -3790,6 +3852,15 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
 
 document.getElementById('battleBtn').onclick = () => { startMusic(); showFront(); };
+
+// вкладки правої панелі: модулі / кодекс / аналітика
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.onclick = () => {
+    for (const b of document.querySelectorAll('.tab')) b.classList.toggle('on', b === tab);
+    for (const body of document.querySelectorAll('.tabBody'))
+      body.classList.toggle('hidden', body.id !== 'tab-' + tab.dataset.tab);
+  };
+}
 document.getElementById('freeBattleBtn').onclick = () => { startMusic(); startBattle(null); };
 document.getElementById('backHangarBtn').onclick = frontToHangar;
 document.getElementById('resumeBtn').onclick = resumeGame;
@@ -3903,7 +3974,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v30 · режим ОБОРОНА: втримай базу 5 хвиль';
+const GAME_VERSION = 'v31 · ангар в один екран + вільний досвід';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

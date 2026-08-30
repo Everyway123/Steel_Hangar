@@ -59,9 +59,10 @@ No build step. No `npm install`. Open the file.
 
 ### 🌳 Fourteen tanks, four branches
 Scouts, mediums, heavies, tank destroyers — up to tier 7.
-Earn tank XP to research the next one, silver to buy it,
-crew XP that quietly makes everything better.
-Every module maxed → the tank goes **ELITE**.
+Tank XP researches the next one, silver buys it, crew XP
+quietly makes everything better. Sit at the end of a branch
+and your XP becomes **free XP**, spendable anywhere — no
+dead ends. Every module maxed → the tank goes **ELITE**.
 
 </td><td width="50%">
 
@@ -112,9 +113,9 @@ against the boss. All synthesised live; tracks swap on the bar.
 
 <div align="center">
 
-### The hangar remembers everything
+### The hangar remembers everything — and fits on one screen
 
-<img src="docs/hangar.png" width="760" alt="Hangar: research tree, tank stats, modules, trophy codex">
+<img src="docs/hangar.png" width="760" alt="Hangar: the whole research tree as four branch rows, tank stats, modules, tabs">
 
 ### Fourteen sectors from the Bridgehead to the ☭ Citadel
 
@@ -181,8 +182,11 @@ the explosions are particles, the reverb is a noise buffer with a power-law deca
 Steel_Hangar/
 ├── index.html      hangar UI, campaign map, overlays, styles
 ├── game.js         game loop, AI, rendering, audio, save
+├── CHANGELOG.md    what changed in each version, with the numbers
 └── docs/           screenshots
 ```
+
+What changed and when: **[CHANGELOG.md](CHANGELOG.md)**.
 
 ## Contributing
 
