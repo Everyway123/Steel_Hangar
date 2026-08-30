@@ -33,13 +33,13 @@ const TANKS = {
   tytan:    { name: 'Об.705 «Титан»',    cls: 'ВТ', tier: 7, hp: 92, dmg: 7,  fireCd: 750,  speed: 0.95, armor: 5, bulletSpeed: 8.0,  size: 44,
               prev: 'mamont',   research: 15000, cost: 30000, desc: 'Абсолютна вершина. Земля дрижить, вороги розбігаються.' },
   // Снайпери (ПТ-САУ)
-  osa:      { name: 'СУ-85 «Оса»',       cls: 'ПТ', tier: 4, hp: 18, dmg: 6,  fireCd: 850,  speed: 1.45, armor: 0, bulletSpeed: 9.0,  size: 34,
+  osa:      { name: 'СУ-85 «Оса»',       cls: 'ПТ', tier: 4, hp: 18, dmg: 12,  fireCd: 850,  speed: 1.45, armor: 0, bulletSpeed: 9.0,  size: 34,
               prev: 'veteran',  research: 2600,  cost: 4500,  desc: 'Снайпер. Один влучний постріл вирішує все.' },
-  kobra:    { name: 'ІСУ-152 «Кобра»',   cls: 'ПТ', tier: 5, hp: 24, dmg: 9,  fireCd: 980,  speed: 1.3,  armor: 1, bulletSpeed: 10.0, size: 36,
+  kobra:    { name: 'ІСУ-152 «Кобра»',   cls: 'ПТ', tier: 5, hp: 24, dmg: 15,  fireCd: 980,  speed: 1.3,  armor: 1, bulletSpeed: 10.0, size: 36,
               prev: 'osa',      research: 5000,  cost: 9000, desc: '«Бах» — і ворога більше немає.' },
-  skorpion: { name: 'СУ-100 «Скорпіон»', cls: 'ПТ', tier: 6, hp: 30, dmg: 12, fireCd: 1050, speed: 1.3, armor: 1, bulletSpeed: 10.5, size: 38,
+  skorpion: { name: 'СУ-100 «Скорпіон»', cls: 'ПТ', tier: 6, hp: 30, dmg: 17, fireCd: 1050, speed: 1.3, armor: 1, bulletSpeed: 10.5, size: 38,
               prev: 'kobra',    research: 8500,  cost: 16000, desc: 'Жало, що пробиває все. Навіть важкі бояться.' },
-  aspid:    { name: 'Об.268 «Аспід»',    cls: 'ПТ', tier: 7, hp: 38, dmg: 16, fireCd: 1150, speed: 1.2, armor: 2, bulletSpeed: 11.0, size: 40,
+  aspid:    { name: 'Об.268 «Аспід»',    cls: 'ПТ', tier: 7, hp: 38, dmg: 20, fireCd: 1150, speed: 1.2, armor: 2, bulletSpeed: 11.0, size: 40,
               prev: 'skorpion', research: 15000, cost: 30000, desc: 'Один постріл — один труп. Навіть боси здригаються.' },
 };
 const TREE_ORDER = ['kadet', 'sokil', 'pryvyd', 'veteran', 'bars', 'shkval',
@@ -400,15 +400,16 @@ const ENEMY_TYPES = {
   soldier: { hp: 6,  speed: 1.1, size: 34, dmg: 2, fireCd: 1400, credits: 85,  xp: 17, color: '#ff9d5c', cls: 'СТ' },
   heavy:   { hp: 12, speed: 0.75, size: 36, dmg: 3, fireCd: 1300, credits: 140, xp: 28, color: '#e06666', cls: 'ВТ' },
   rocket:  { hp: 5,  speed: 0.95, size: 34, dmg: 3, fireCd: 3300, credits: 170, xp: 32, color: '#ffd23f', cls: 'ПТ', homing: true },
-  boss:    { hp: 75, speed: 0.7, size: 48, dmg: 4, fireCd: 1000,  credits: 900, xp: 220, color: '#ff4d5e', cls: 'ВТ' },
+  boss:    { hp: 75, speed: 0.7, size: 38, dmg: 4, fireCd: 1000,  credits: 900, xp: 220, color: '#ff4d5e', cls: 'ВТ' },
 };
 
 function buildRoster(tier, elite) {
   const pool = [];
-  // щільний бій на одному екрані: ростер тримає раунд, а не закінчується за 40 с
-  // ростер має вибиватись за раунд: заміряно 0.24 фрага/с, ліміт 140 с
-  // → стеля близько 33 ворогів разом із хвилями
-  const count = 12 + tier * 2;
+  // Кількість була спробою компенсувати те, що поодинці ворог не страшний:
+  // на 5-му тірі виходило 22 у ростері + 4 хвилі по 7 = 50 танків на одного.
+  // Тепер небезпеку дає scaledEnemy через playerPower, тож ростер зрізано,
+  // а щільність на екрані (maxAlive) лишається високою — це різні речі.
+  const count = 10 + tier;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -865,7 +866,11 @@ function startBattle(sector) {
     gameMs: 0, dmgTaken: 0,
     perks: [],
     tierMult: 1 + 0.3 * (st.tier - 1),
+    power: 1,   // рахуємо нижче, коли battle.tank уже на місці
   };
+  // сила твоєї збірки відносно голого танка того ж тіру — від неї залежить,
+  // наскільки злими будуть вороги цього бою
+  battle.power = playerPower();
   logEvent('battle_start', { tank: st.id, tier: st.tier, map: mapDef.name, mode: battle.mode, elite });
 
   player = {
@@ -936,14 +941,20 @@ function startBattle(sector) {
       grid[gr][gc] = T_TURRET; gridHp[gr][gc] = 12 + 5 * st.tier;
     }
   };
-  // прибираємо стіни, що могли б замурувати точки спавну ворогів
+  // Прибираємо стіни, що могли б замурувати точки спавну ворогів.
+  // Раніше тут чистилась тільки цегла, а фортеця штабу зроблена зі СТАЛІ:
+  // спавн усередині фортеці лишався замурованим, ворог народжувався в стіні,
+  // застрягав, і його кулі гасли об цю ж стіну одразу після пострілу.
   const clearSpawns = () => {
     for (const p of spawnPoints) {
       const r = Math.floor(p.y / TILE), c = Math.floor(p.x / TILE);
       for (const [dr, dc] of [[0,0],[1,0],[0,1],[0,-1]]) {
         const rr = r + dr, cc = c + dc;
         if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
-        if (grid[rr][cc] === T_BRICK) grid[rr][cc] = T_EMPTY;
+        if (grid[rr][cc] === T_HOME || grid[rr][cc] === T_HQ) continue;  // бази не чіпаємо
+        if (grid[rr][cc] === T_BRICK || grid[rr][cc] === T_STEEL || grid[rr][cc] === T_TURRET) {
+          grid[rr][cc] = T_EMPTY; gridHp[rr][cc] = 0;
+        }
       }
     }
   };
@@ -1072,17 +1083,33 @@ function startBattle(sector) {
 }
 
 // ---------- Масштабування ворогів під тір ----------
+// Наскільки прокачаний танк сильніший за ГОЛИЙ танк того ж тіру.
+// 1.0 — щойно куплений, ~1.8 — елітний з екіпажем 10. Без цієї величини
+// складність бачила лише номер тіру: модулі й екіпаж давали ×2.6 живучості
+// (заміряно 30с → 79с на Шквалі), і прокачаний танк ставав невразливим.
+function playerPower() {
+  const id = (battle && battle.tank && battle.tank.id) || save.current;
+  const base = TANKS[id];
+  if (!base) return 1;
+  const st = tankStats(id);
+  const hpR = st.hp / base.hp, dmgR = st.dmg / base.dmg;
+  return Math.max(1, Math.min(2, Math.sqrt(hpR * dmgR)));
+}
+
 function scaledEnemy(typeName, tier) {
   const t = ENEMY_TYPES[typeName];
   const fl = (save.front && save.front.level || 1) - 1; // рівень фронту робить всіх злішими
   const wv = Math.max(0, (battle.wave || 1) - 1);       // кожна хвиля — сильніші вороги
-  const hpMult = (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv);
+  const pw = battle.power || 1;                         // і твоя власна прокачка
+  // Зрізаний ростер сам по собі вкоротив раунд 88с → 65с. Щоб бій тримав час
+  // без юрби, ворог має жити довше: не «більше танків», а «міцніший танк».
+  const hpMult = 1.4 * (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv) * pw;
   const dmgAdd = (tier <= 2 ? -1 : 0) + Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
     hp: Math.round(t.hp * hpMult), maxHp: Math.round(t.hp * hpMult),
     speed: t.speed * (1 + 0.06 * wv), size: t.size,
-    dmg: Math.max(1, t.dmg + dmgAdd), fireCd: t.fireCd,
+    dmg: Math.max(1, Math.round((t.dmg + dmgAdd) * pw)), fireCd: t.fireCd,
     credits: t.credits, xpVal: t.xp, color: t.color,
   };
 }
@@ -1109,8 +1136,22 @@ function tanksOverlap(a, b) {
   return Math.abs(a.x - b.x) < (a.size + b.size) / 2 &&
          Math.abs(a.y - b.y) < (a.size + b.size) / 2;
 }
+// скільки кутів корпусу сидить у стіні — потрібно, щоб вибиратись назовні
+function blockedCorners(x, y, size) {
+  const h = size / 2 - 0.01;
+  return (solidAt(x - h, y - h) ? 1 : 0) + (solidAt(x + h, y - h) ? 1 : 0) +
+         (solidAt(x - h, y + h) ? 1 : 0) + (solidAt(x + h, y + h) ? 1 : 0);
+}
 function canMoveTo(tank, nx, ny) {
-  if (!rectFree(nx, ny, tank.size, false)) return false;
+  if (!rectFree(nx, ny, tank.size, false)) {
+    // Аварійний вихід. Якщо танк уже стоїть у стіні (мур виріс під ним,
+    // зсув притиснув до цегли), то без цього КОЖЕН напрямок відхиляється і
+    // танк застрягає назавжди. Дозволяємо рух, який зменшує занурення.
+    const now = blockedCorners(tank.x, tank.y, tank.size);
+    // не «менше», а «не гірше»: у центрі суцільного муру жоден крок одразу
+    // не зменшує занурення, тож танк має право проповзти вбік до краю
+    if (now === 0 || blockedCorners(nx, ny, tank.size) > now) return false;
+  }
   const probe = { x: nx, y: ny, size: tank.size };
   if (tank !== player && tanksOverlap(probe, player)) return false;
   for (const e of enemies) {
@@ -1157,13 +1198,17 @@ function moveTank(tank, dir, dist) {
   }
   const nx = tank.x + dx * dist, ny = tank.y + dy * dist;
   if (canMoveTo(tank, nx, ny)) { tank.x = nx; tank.y = ny; return true; }
+  // Обхід кута: пробуємо зсунутись убік. Перевіряти треба РІВНО ту точку,
+  // куди станемо — раніше тут перевірялось (nx, y±step), а зсув робився на
+  // (x, y±dist), тобто в неперевірену позицію, і танк заїжджав у стіну.
   for (const step of [4, 8, 12]) {
+    const d = Math.min(step, dist);
     if (dx !== 0) {
-      if (canMoveTo(tank, nx, tank.y - step)) { tank.y -= Math.min(step, dist); return true; }
-      if (canMoveTo(tank, nx, tank.y + step)) { tank.y += Math.min(step, dist); return true; }
+      if (canMoveTo(tank, tank.x, tank.y - d)) { tank.y -= d; return true; }
+      if (canMoveTo(tank, tank.x, tank.y + d)) { tank.y += d; return true; }
     } else {
-      if (canMoveTo(tank, tank.x - step, ny)) { tank.x -= Math.min(step, dist); return true; }
-      if (canMoveTo(tank, tank.x + step, ny)) { tank.x += Math.min(step, dist); return true; }
+      if (canMoveTo(tank, tank.x - d, tank.y)) { tank.x -= d; return true; }
+      if (canMoveTo(tank, tank.x + d, tank.y)) { tank.x += d; return true; }
     }
   }
   return false;
@@ -1251,11 +1296,22 @@ function trySpawnEnemy(dt) {
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
   spawnTimer = 1000;
-  const pt = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
   const e = scaledEnemy(spawnQueue.shift(), battle.tank.tier);
-  // великі танки притискаємо всередину поля, щоб не застрягали біля краю
-  e.x = Math.min(W - e.size / 2 - 2, Math.max(e.size / 2 + 2, pt.x));
-  e.y = Math.min(H - e.size / 2 - 2, Math.max(e.size / 2 + 2, pt.y));
+  // Точку вибираємо ту, де танк реально поміститься: інакше він народжується
+  // всередині стіни, застрягає і не може стріляти. Перебираємо всі точки у
+  // випадковому порядку, і лише якщо жодна не вільна — беремо першу-ліпшу.
+  const clamp = p => ({
+    x: Math.min(W - e.size / 2 - 2, Math.max(e.size / 2 + 2, p.x)),
+    y: Math.min(H - e.size / 2 - 2, Math.max(e.size / 2 + 2, p.y)),
+  });
+  const shuffled = spawnPoints.slice().sort(() => Math.random() - 0.5);
+  let pos = null;
+  for (const p of shuffled) {
+    const q = clamp(p);
+    if (rectFree(q.x, q.y, e.size, false)) { pos = q; break; }
+  }
+  if (!pos) pos = clamp(shuffled[0]);
+  e.x = pos.x; e.y = pos.y;
   e.dir = 'down';
   e.cooldown = 800 + Math.random() * 800;
   e.thinkTimer = 0;
@@ -2145,6 +2201,12 @@ function rebuildHomeWall() {
     if (dr === -1 || (dr === 0 && dc === 0)) continue;
     const rr = r0 + dr, cc = c0 + dc;
     if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+    // не мурувати цеглу під танком — інакше той, хто стоїть біля бази,
+    // опиняється замурованим у власній стіні
+    const cx = cc * TILE + TILE / 2, cy = rr * TILE + TILE / 2;
+    const occupied = [player, ...(battle.helpers || []), ...enemies].some(t =>
+      t && !t.dead && Math.abs(t.x - cx) < (t.size + TILE) / 2 && Math.abs(t.y - cy) < (t.size + TILE) / 2);
+    if (occupied) continue;
     if (grid[rr][cc] === T_EMPTY || grid[rr][cc] === T_SAND || grid[rr][cc] === T_ICE) {
       grid[rr][cc] = T_BRICK; gridHp[rr][cc] = 6;
       spawnParticles(cc * TILE + TILE / 2, rr * TILE + TILE / 2, '#c9694a', 6);
@@ -2228,11 +2290,14 @@ function spawnHelper() {
     return;
   }
   const spot = findOpenSpot(60, 220) || { x: player.x, y: player.y - TILE };
-  const hp = Math.max(6, Math.round(player.maxHp * 0.6));
+  // Помічник був ЛТ за корпусом (32) і надто крихкий, щоб від нього була
+  // користь: гинув раніше, ніж встигав відтягнути вогонь. Тепер це СТ —
+  // ширший силует, більше живучості й урону, але й повільніший.
+  const hp = Math.max(8, Math.round(player.maxHp * 0.75));
   const h = {
-    x: spot.x, y: spot.y, size: 32, dir: 'up', turretAngle: -Math.PI / 2,
-    hp, maxHp: hp, dmg: player.dmg * 0.7, speed: player.speed * 0.95,
-    fireCd: Math.round(player.fireCd * 1.3), cooldown: 600, thinkTimer: 0,
+    x: spot.x, y: spot.y, size: 34, dir: 'up', turretAngle: -Math.PI / 2,
+    hp, maxHp: hp, dmg: player.dmg * 0.8, speed: player.speed * 0.9,
+    fireCd: Math.round(player.fireCd * 1.15), cooldown: 600, thinkTimer: 0,
     ally: true, dead: false, spawning: 0, tread: 0, flash: 0, cls: 'СТ',
   };
   battle.helpers.push(h);
@@ -2299,6 +2364,29 @@ function updateOneHelper(h, dt) {
   }
 }
 
+// ЗІРКА. Раніше вона просто давала 120 🪙 — тобто ніяк не змінювала бій.
+// В оригінальному Battle City ★ підсилювала танк, і саме цього тут бракувало.
+// Тепер зірки складаються протягом бою: швидший снаряд → урон → другий ствол.
+const STAR_STEPS = [
+  { txt: '★ швидший снаряд', on: () => { player.bulletSpeed *= 1.25; } },
+  { txt: '★★ +30% урону',    on: () => { player.dmg *= 1.3; } },
+  { txt: '★★★ ДРУГИЙ СТВОЛ', on: () => { player.twin = true; } },
+];
+function takeStar(x, y, prefix) {
+  battle.stars = (battle.stars || 0) + 1;
+  const step = STAR_STEPS[battle.stars - 1];
+  if (step) {
+    step.on();
+    floatText(x, y, prefix + step.txt, '#ffd23f');
+  } else {
+    // далі зірок нема чим дивувати — кожна наступна просто додає урон
+    player.dmg *= 1.15;
+    floatText(x, y, `${prefix}★×${battle.stars} +15% урону`, '#ffd23f');
+  }
+  battle.credits += 60;
+  sfx.perk();
+}
+
 // ---------- Дропи, частинки ----------
 function updateDrops(dt) {
   for (const d of drops) {
@@ -2308,6 +2396,33 @@ function updateDrops(dt) {
       if (d.kind === 'crate') { battle.crateOut = false; battle.pts += SUPPLY_COST * 0.6; }
       continue;
     }
+    // Союзник теж збирає трофеї — але не собі, а ТОБІ: інакше вороги гребуть
+    // коробки, а свій проїжджає повз, і виглядає це безглуздо.
+    let taken = false;
+    for (const h of (battle.helpers || [])) {
+      if (h.dead) continue;
+      if (Math.abs(d.x - h.x) > 26 || Math.abs(d.y - h.y) > 26) continue;
+      d.dead = true; taken = true;
+      sfx.pickup();
+      if (CRATES[d.kind]) {
+        applyCrate(player, d.kind);
+        floatText(d.x, d.y, `🤝 помічник приніс ${CRATES[d.kind].ico}`, '#39ff88');
+      } else if (d.kind === 'star') {
+        takeStar(d.x, d.y, '🤝 ');
+      } else if (d.kind === 'med') {
+        player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.3));
+        floatText(d.x, d.y, '🤝 +HP', '#ff8c69');
+      } else if (d.kind === 'crate') {
+        battle.crateOut = false;
+        pendingPerks++;
+        drops = drops.filter(x => !x.dead);
+        openPerkMenu();
+        return;
+      }
+      break;
+    }
+    if (taken) continue;
+
     // ворог теж бігає за трофеями — хто перший, того й сила
     for (const e of enemies) {
       if (e.dead || e.spawning > 0) continue;
@@ -2339,7 +2454,7 @@ function updateDrops(dt) {
       d.dead = true;
       sfx.pickup();
       if (d.kind === 'med') { player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.3)); floatText(d.x, d.y, '+HP', '#ff8c69'); }
-      else if (d.kind === 'star') { battle.credits += 120; floatText(d.x, d.y, '+120 🪙', '#ffd23f'); }
+      else if (d.kind === 'star') { takeStar(d.x, d.y, ''); }
       else if (d.kind === 'freeze') { freezeTimer = 4000; floatText(d.x, d.y, 'ЗАМОРОЗКА!', '#6fd3ff'); }
       else if (CRATES[d.kind]) { sfx.perk(); applyCrate(player, d.kind); }
       else if (d.kind === 'crate') {
@@ -3485,7 +3600,8 @@ function loop(now) {
     battle.waveFlash = 2200;
     // хвиля має ПРИВОДИТИ ворогів. Раніше лічильник крутився вхолосту:
     // напис «ХВИЛЯ 3» був, а підкріплення не приходило зовсім
-    const reinf = buildRoster(battle.tank.tier, false).slice(0, 2 + battle.tank.tier);
+    // хвиля 2+тір давала на 5-му тірі 28 підкріплень поверх ростера
+    const reinf = buildRoster(battle.tank.tier, false).slice(0, 2 + Math.floor(battle.tank.tier / 2));
     spawnQueue.push(...reinf);
     battle.totalEnemies += reinf.length;
     sfx.boom();
@@ -3974,7 +4090,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v31 · ангар в один екран + вільний досвід';
+const GAME_VERSION = 'v32 · тебе знову можна вбити + ★ підсилює танк';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

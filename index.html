@@ -63,6 +63,13 @@
     --blue: #2fb7ff;
     --text: #d7e0f0;
     --dim: #7a8aa8;
+    /* Шкала тексту ангара. На 1180–1450 px це рівно ті самі розміри, що були,
+       а далі росте разом з екраном — інакше на великому моніторі все лишалось
+       дрібним, бо ширина зафіксована, а шрифти були в жорстких пікселях. */
+    --fs-xs: clamp(10px, 0.60vw, 14px);
+    --fs-sm: clamp(12px, 0.72vw, 16px);
+    --fs-md: clamp(14px, 0.88vw, 19px);
+    --fs-xl: clamp(18px, 1.30vw, 28px);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -84,7 +91,7 @@
      тільки всередині нижніх панелей, сама сторінка не скролиться. */
   #hangarView {
     /* мінус padding самого body — інакше сторінка переливається рівно на нього */
-    width: 100%; max-width: 1180px; height: calc(100dvh - 20px);
+    width: 100%; max-width: min(96vw, 1520px); height: calc(100dvh - 20px);
     display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 10px;
   }
   #hangarHead {
@@ -92,56 +99,56 @@
     background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
     padding: 9px 16px;
   }
-  #hangarHead h1 { font-size: 18px; color: var(--neon); text-shadow: 0 0 10px rgba(57,255,136,.5); }
-  #hangarHead .res { display: flex; gap: 16px; font-size: 14px; }
+  #hangarHead h1 { font-size: var(--fs-xl); color: var(--neon); text-shadow: 0 0 10px rgba(57,255,136,.5); }
+  #hangarHead .res { display: flex; gap: 16px; font-size: var(--fs-md); }
   #hangarHead .res b { color: var(--gold); }
   #hangarMain { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 0; }
   .box {
     background: var(--panel); border: 2px solid var(--border); border-radius: 8px;
     padding: 12px;
   }
-  .box h2 { font-size: 14px; color: var(--blue); margin-bottom: 8px; }
-  .box h2 .hint { color: var(--dim); font-size: 11px; letter-spacing: 0; }
+  .box h2 { font-size: var(--fs-md); color: var(--blue); margin-bottom: 8px; }
+  .box h2 .hint { color: var(--dim); font-size: var(--fs-xs); letter-spacing: 0; }
   /* панелі прокручуються самі, а не тягнуть сторінку вниз */
   .pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .pane > #tankStats, .tabBody { overflow-y: auto; min-height: 0; flex: 1; }
   #detailTop { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
-  #tankAction { flex: 1; font-size: 12px; }
+  #tankAction { flex: 1; font-size: var(--fs-sm); }
   #treeBox { padding: 10px 12px; }
 
   /* ДЕРЕВО: чотири гілки — чотири горизонтальні рядки, усе видно одразу */
   .branchRow { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
   .branchName {
-    flex: 0 0 88px; color: var(--dim); font-size: 11px; text-align: right;
+    flex: 0 0 88px; color: var(--dim); font-size: var(--fs-xs); text-align: right;
     padding-right: 6px; border-right: 1px dashed var(--border);
   }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
   .chip {
     background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 5px 9px; cursor: pointer; min-width: 108px; line-height: 1.25;
+    padding: 5px 9px; cursor: pointer; min-width: clamp(108px, 8vw, 150px); line-height: 1.25;
   }
   .chip:hover { border-color: var(--blue); }
   .chip.sel { border-color: var(--neon); box-shadow: 0 0 8px rgba(57,255,136,.3); }
   .chip.locked { opacity: .45; }
   .chip.buy { border-color: var(--gold); }
-  .chip .tn { font-size: 12px; }
-  .chip .badge { font-size: 10px; color: var(--gold); display: block; }
+  .chip .tn { font-size: var(--fs-sm); }
+  .chip .badge { font-size: var(--fs-xs); color: var(--gold); display: block; }
   .chip .badge.dim { color: var(--dim); }
 
   /* ВКЛАДКИ праворуч замість трьох панелей одна під одною */
   .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
   .tab {
     flex: 1; background: transparent; border: 1px solid var(--border); color: var(--dim);
-    font-family: inherit; font-size: 11px; padding: 6px 4px; border-radius: 5px; cursor: pointer;
+    font-family: inherit; font-size: var(--fs-sm); padding: 6px 4px; border-radius: 5px; cursor: pointer;
   }
   .tab:hover { border-color: var(--blue); color: var(--blue); }
   .tab.on { border-color: var(--neon); color: var(--neon); }
-  .statRow { display: flex; justify-content: space-between; margin: 4px 0; font-size: 14px; }
+  .statRow { display: flex; justify-content: space-between; margin: 4px 0; font-size: var(--fs-md); }
   .statRow .val { color: var(--gold); }
   .modRow {
     display: flex; justify-content: space-between; align-items: center;
     background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px 10px; margin: 6px 0; font-size: 13px;
+    padding: 8px 10px; margin: 6px 0; font-size: var(--fs-sm);
   }
   .pips { color: var(--neon); letter-spacing: 2px; }
   .btn {
@@ -157,13 +164,13 @@
   .btn.danger { border-color: var(--danger); color: var(--danger); }
   .btn.danger:hover:not(:disabled) { background: var(--danger); color: #05070c; }
   #battleBtn {
-    width: 100%; font-size: 19px; padding: 11px;
+    width: 100%; font-size: clamp(19px, 1.5vw, 30px); padding: 11px;
     text-shadow: 0 0 8px rgba(255,210,63,.5);
   }
   #hangarBottom { display: flex; flex-direction: column; gap: 5px; }
   #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
-  #hangarFoot { text-align: center; color: var(--dim); font-size: 11px; }
+  #hangarFoot { text-align: center; color: var(--dim); font-size: var(--fs-xs); }
 
   /* ======== БІЙ ======== */
   #battleView { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }

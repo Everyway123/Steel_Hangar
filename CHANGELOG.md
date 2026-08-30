@@ -4,6 +4,57 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v32 — you can be killed again, and the star means something
+
+**Tanks no longer get stuck.** Three separate causes, all real:
+
+- `moveTank`'s corner-slide validated one position and then moved the tank to
+  a *different* one, so it could slide into a wall. A tank overlapping a wall
+  had every direction rejected — stuck forever, and its shells died against
+  that same wall the instant they spawned, which reads as "my gun stopped
+  firing".
+- Spawn points were cleared of **brick** only, but the enemy HQ fortress is
+  built from **steel** — a spawn inside the fortress stayed walled, so enemies
+  were born inside it.
+- The boss hull was 48px on a 40px tile. It could not fit through a
+  single-tile gap anywhere on any map. Now 38px — still the largest tank,
+  but it drives. Measured 180–254px of travel per run across four maps.
+
+There is also a last-resort escape: a tank already overlapping a wall may move
+in any direction that does not make the overlap worse, so no future bug can
+trap anyone permanently.
+
+**Difficulty now sees your build, not just your tier.** Modules and crew were
+worth ×2.6 survivability (30 s → 79 s standing still on an elite Т-62), while
+enemy strength keyed off tank tier alone — so a maxed tank was effectively
+immortal, and the game compensated with *quantity*: 22 in the roster plus four
+waves of seven, **50 tanks against one player** at tier 5.
+
+Enemies now scale with `playerPower()` — how much stronger your build is than
+a bare tank of the same tier (1.0 fresh, capped at 2.0). Against an elite Т-62
+a standard enemy is 19 HP / 7 damage instead of 10 / 4. With danger coming from
+quality, the roster was cut to 30 total. Measured over 16 battles: **50% wins,
+60.7 s, 12.8 frags, and 8 deaths — against 2 deaths before.**
+
+Elite survivability standing still: **79 s → 41 s**. A bare tank is 24 s, so
+progression is still worth ×1.7 — it just stops being immunity.
+
+**Tank destroyers were a bad deal, and now they aren't.** At tier 5 the Кобра
+paid 2.3× survivability for 1.2× damage — strictly worse than playing a heavy,
+which is exactly what it felt like. The whole ПТ line was rebalanced around
+its own promise ("one bang and the enemy is gone"): **one shot kills a standard
+enemy, two kill a heavy.** 15–17 DPS against 6.5–9.3 for heavies, paid for with
+18–43 effective HP against 39–131. A real glass cannon instead of a bad trade.
+
+**The ★ makes your tank stronger.** It used to hand out 120 silver and change
+nothing about the fight. As in the original Battle City, stars now stack over a
+battle: faster shell → +30% damage → **second barrel** → +15% damage each after.
+
+**Your wingman is a medium now.** It had a light tank's hull (32px) and 60% of
+your health, so it died before it could pull any fire. Now 34px, 75% of your
+health, 80% of your damage — and it picks up crates and stars, applying them to
+**you**. Enemies were looting the field while your own ally drove past.
+
 ## v31 — one-screen hangar, no dead ends
 
 **The hangar fits on one screen.** The research tree used to be a column of
