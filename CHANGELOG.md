@@ -4,6 +4,39 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v33 — the wingman got a brain
+
+v32 fixed the ally's *stats* and left its head alone, so it still earned the
+name it was given. It drove at the **nearest** enemy across the whole map,
+abandoning you; it moved in one cardinal direction and, on hitting a wall,
+re-picked that same direction and ground against it; it drove past crates
+while enemies actively looted the field; and in Defense it never noticed the
+base it was supposed to hold.
+
+It now has priorities — **grab the crate → don't drift from you → cover the
+base in Defense → shoot the nearest enemy** — and a real route: breadth-first
+search over the tile grid. The field is 16×14, so recomputing a path a few
+times a second costs nothing. Firing target is computed separately from the
+movement target, so it shoots while driving for loot.
+
+Two of my own mistakes, both caught by measurement rather than guessed:
+
+- The first priority order put "stay near the player" above the crate, so the
+  ally was turned around *on approach* — it closed to 56 px and went back.
+  The crate now comes first, but only when it is near both the ally and you.
+- The cheap fix (turn perpendicular for 600 ms when blocked) only half-worked:
+  the ally still stalled 78–158 px from a crate behind a wall in 2 runs out of
+  5. Greedy movement cannot route around an obstacle at all; that is what the
+  BFS is for. Six consecutive runs now pass 8/8.
+
+**The regression suite lives in the repository now.** It had been sitting in a
+temporary directory and vanished with a container restart — precisely when the
+AI had just changed. `node tests/regression.js` runs eight blocks and 64
+checks, each guarding a bug that was once real. `node tools/bundle.js` builds
+the standalone `steel-hangar.html` and fails loudly if any external reference
+survives; that script had been ephemeral too, which is why the single-file
+build silently lagged behind the repository.
+
 ## v32 — you can be killed again, and the star means something
 
 **Tanks no longer get stuck.** Three separate causes, all real:

@@ -4224,7 +4224,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v32 · тебе знову можна вбити + ★ підсилює танк';
+const GAME_VERSION = 'v33 · союзник шукає шлях, а не тицяється в стіну';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
