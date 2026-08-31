@@ -409,7 +409,7 @@ function buildRoster(tier, elite) {
   // на 5-му тірі виходило 22 у ростері + 4 хвилі по 7 = 50 танків на одного.
   // Тепер небезпеку дає scaledEnemy через playerPower, тож ростер зрізано,
   // а щільність на екрані (maxAlive) лишається високою — це різні речі.
-  const count = 10 + tier;
+  const count = 14 + tier;
   for (let i = 0; i < count; i++) {
     const r = Math.random();
     if (tier <= 2) pool.push(r < 0.6 ? 'scout' : 'soldier');
@@ -429,7 +429,7 @@ const SUPPLY_MS = 45000;              // (лишається як страхов
 // заміряно тестом enemyfire.js — ціль ~1.3 постр/с на т1 і ~3 постр/с на т4+
 function enemyFireGap() {
   const tier = battle.tank.tier;
-  return tier <= 2 ? 380 : tier <= 3 ? 300 : 220;
+  return tier <= 2 ? 530 : tier <= 3 ? 420 : 310;
 }
 const SUPPLY_COST = 100;              // бойових очок на одне постачання
 // очки за дії: фраг, урон, шкода ворожій базі — сила заробляється боєм
@@ -952,6 +952,12 @@ function startBattle(sector) {
         const rr = r + dr, cc = c + dc;
         if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
         if (grid[rr][cc] === T_HOME || grid[rr][cc] === T_HQ) continue;  // бази не чіпаємо
+        // ДОТ зносимо ЛИШЕ якщо він рівно на клітині спавну. Раніше тут
+        // чистились і сусідні клітини — а ДОТи стоять по флангах ворожого
+        // штабу вгорі, поруч зі спавнами, тож я сам їх і зносив: гравець
+        // бачив фортецю, яка не стріляє.
+        const onSpawn = dr === 0 && dc === 0;
+        if (grid[rr][cc] === T_TURRET && !onSpawn) continue;
         if (grid[rr][cc] === T_BRICK || grid[rr][cc] === T_STEEL || grid[rr][cc] === T_TURRET) {
           grid[rr][cc] = T_EMPTY; gridHp[rr][cc] = 0;
         }
@@ -1103,7 +1109,7 @@ function scaledEnemy(typeName, tier) {
   const pw = battle.power || 1;                         // і твоя власна прокачка
   // Зрізаний ростер сам по собі вкоротив раунд 88с → 65с. Щоб бій тримав час
   // без юрби, ворог має жити довше: не «більше танків», а «міцніший танк».
-  const hpMult = 1.4 * (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv) * pw;
+  const hpMult = 1.9 * (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv) * pw;
   const dmgAdd = (tier <= 2 ? -1 : 0) + Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
@@ -1198,18 +1204,30 @@ function moveTank(tank, dir, dist) {
   }
   const nx = tank.x + dx * dist, ny = tank.y + dy * dist;
   if (canMoveTo(tank, nx, ny)) { tank.x = nx; tank.y = ny; return true; }
-  // Обхід кута: пробуємо зсунутись убік. Перевіряти треба РІВНО ту точку,
-  // куди станемо — раніше тут перевірялось (nx, y±step), а зсув робився на
-  // (x, y±dist), тобто в неперевірену позицію, і танк заїжджав у стіну.
-  for (const step of [4, 8, 12]) {
-    const d = Math.min(step, dist);
+  // ОБХІД КУТА. Тут двічі помилялись по-різному, тож словами:
+  // спершу код перевіряв (nx, y±step), а зсував на (x, y±dist) — рухав танк
+  // у неперевірену точку, і той заїжджав у стіну. Потім я зробив перевірку
+  // й рух однаковими, але суто БОКОВИМИ — танк зсувався рівно вбік без
+  // просування вперед, і це виглядало як крабове ковзання вздовж стіни.
+  // Правильно — зсув ПО ДІАГОНАЛІ: рухаємось туди, куди тиснемо, і трохи
+  // вбік, щоб оминути кут; перевіряємо рівно цю точку.
+  for (const off of [dist, 4, 8, 12]) {
     if (dx !== 0) {
-      if (canMoveTo(tank, tank.x, tank.y - d)) { tank.y -= d; return true; }
-      if (canMoveTo(tank, tank.x, tank.y + d)) { tank.y += d; return true; }
+      if (canMoveTo(tank, nx, tank.y - off)) { tank.x = nx; tank.y -= off; return true; }
+      if (canMoveTo(tank, nx, tank.y + off)) { tank.x = nx; tank.y += off; return true; }
     } else {
-      if (canMoveTo(tank, tank.x - d, tank.y)) { tank.x -= d; return true; }
-      if (canMoveTo(tank, tank.x + d, tank.y)) { tank.x += d; return true; }
+      if (canMoveTo(tank, tank.x - off, ny)) { tank.x -= off; tank.y = ny; return true; }
+      if (canMoveTo(tank, tank.x + off, ny)) { tank.x += off; tank.y = ny; return true; }
     }
+  }
+  // остання спроба — притертись убік, щоб намацати прохід (без просування)
+  const slide = Math.min(4, dist);
+  if (dx !== 0) {
+    if (canMoveTo(tank, tank.x, tank.y - slide)) { tank.y -= slide; return true; }
+    if (canMoveTo(tank, tank.x, tank.y + slide)) { tank.y += slide; return true; }
+  } else {
+    if (canMoveTo(tank, tank.x - slide, tank.y)) { tank.x -= slide; return true; }
+    if (canMoveTo(tank, tank.x + slide, tank.y)) { tank.x += slide; return true; }
   }
   return false;
 }
@@ -1707,12 +1725,18 @@ function updateTurrets(dt) {
     const dist = Math.hypot(player.x - t.x, player.y - t.y);
     t.ang = Math.atan2(player.y - t.y, player.x - t.x);
     t.cd -= dt;
-    if (t.cd <= 0 && (battle.enemyShotCd || 0) <= 0 && dist < 420 && hasLOS(t.x, t.y, player.x, player.y)) {
+    // Лінію огляду міряємо ВІД ДУЛА, а не від центру. hasLOS робить перший
+    // замір за 16 px від початку — тобто всередині власної клітини ДОТа, а
+    // вона суцільна. Через це LOS у ДОТа був хибним ЗАВЖДИ, з будь-якого
+    // напрямку, і жоден ДОТ не вистрілив жодного разу з моменту появи.
+    const mx = t.x + Math.cos(t.ang) * 24, my = t.y + Math.sin(t.ang) * 24;
+    // ДОТ має власний темп і не ділить спільний ліміт пострілів армії:
+    // при десятку живих танків черга до нього просто не доходила.
+    if (t.cd <= 0 && dist < 420 && hasLOS(mx, my, player.x, player.y)) {
       const ang = t.ang + (Math.random() - 0.5) * 0.2;
       bullets.push({ x: t.x + Math.cos(ang) * 24, y: t.y + Math.sin(ang) * 24, dx: Math.cos(ang), dy: Math.sin(ang), speed: 3.8, dmg: 3, fromPlayer: false });
       sfx.shoot();
       t.cd = 1500 + Math.random() * 500;
-      battle.enemyShotCd = enemyFireGap();
     }
   }
 }
@@ -3283,13 +3307,33 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
-  // помічник — блакитний, з підписом, щоб не сплутати з ворогом
+  // Помічник — ФІОЛЕТОВИЙ. Раніше він був #6fd3ff, а це рівно колір
+  // ворога-розвідника: свого плутали з чужим. У палітрі гравець зелений,
+  // вороги теплі (жовтий, оранж, червоний), тож фіолет — єдиний вільний
+  // слот, який ні з ким не збігається. Плюс живе кільце під корпусом,
+  // щоб свого було видно в юрбі з першого погляду.
+  const ALLY = '#b46bff';
   for (const h of (battle.helpers || [])) {
     if (h.dead) continue;
-    drawTank(h, '#6fd3ff', false);
+    const pulse = 0.55 + 0.45 * Math.sin((battle.gameMs + h.x) / 260);
+    ctx.save();
+    ctx.strokeStyle = ALLY;
+    ctx.globalAlpha = 0.35 + 0.3 * pulse;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(h.x, h.y + h.size / 2 - 2, h.size * 0.55, h.size * 0.26, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.shadowColor = ALLY;
+    ctx.shadowBlur = 12;
+    drawTank(h, ALLY, false);
+    ctx.restore();
+
     ctx.font = '11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#6fd3ff';
+    ctx.fillStyle = ALLY;
     ctx.fillText('🤝 свій', h.x, h.y - h.size / 2 - 16);
   }
 
@@ -4224,7 +4268,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v33 · союзник шукає шлях, а не тицяється в стіну';
+const GAME_VERSION = 'v34 · ДОТи заговорили, танки їздять природно';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

@@ -138,6 +138,42 @@ BLOCKS.spawn = async browser => {
   await page.close();
 };
 
+// ДОТи ворожої фортеці мовчали: clearSpawns зносив їх разом зі стінами
+// навколо точок спавну, а вцілілі ділили спільний ліміт пострілів армії,
+// і при десятку живих танків черга до них не доходила.
+BLOCKS.turret = async browser => {
+  const { page, errs } = await fresh(browser);
+
+  const built = await page.evaluate(() => {
+    startBattle({ id: null, name: 't', map: 'Штурм: Командний центр', mode: 'assault', mod: null });
+    return { turrets: battle.turrets.length, onGrid: grid.flat().filter(t => t === T_TURRET).length };
+  });
+  t('ДОТи переживають чистку спавнів', built.turrets >= 2,
+    `у списку ${built.turrets}, на полі ${built.onGrid}`);
+  t('список ДОТів збігається з полем', built.turrets === built.onGrid,
+    `${built.turrets} проти ${built.onGrid}`);
+
+  const fired = await page.evaluate(async () => {
+    startBattle({ id: null, name: 't', map: 'Штурм: Командний центр', mode: 'assault', mod: null });
+    if (!battle.turrets.length) return { none: true };
+    // ставимо гравця просто перед ДОТом, у прямій видимості
+    const tur = battle.turrets[0];
+    player.x = tur.x; player.y = tur.y + TILE * 2;
+    let shots = 0;
+    for (let i = 0; i < 200; i++) {
+      const before = bullets.length;
+      updateTurrets(25);
+      shots += Math.max(0, bullets.length - before);
+      await new Promise(r => setTimeout(r, 3));
+    }
+    return { shots, cd: tur.cd };
+  });
+  t('ДОТ стріляє по гравцю в зоні', !fired.none && fired.shots > 0, `пострілів ${fired.shots}`);
+
+  t('без помилок сторінки', errs.length === 0, errs[0] || '');
+  await page.close();
+};
+
 // Корпус боса був 48 px при клітині 40 — він не пролазив у жоден однотайловий
 // прохід на жодній карті і застрягав назавжди.
 BLOCKS.boss = async browser => {

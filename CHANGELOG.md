@@ -4,6 +4,62 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v34 — the pillboxes had never fired, and tanks moved like crabs
+
+**The enemy pillboxes have been silent since the day they were added.**
+`hasLOS` takes its first sample 16 px from the origin — inside the pillbox's
+own tile, which is solid. So a pillbox's line of sight was false *always*, in
+every direction, and not one of them ever fired a shot. Sight is now measured
+from the muzzle. Two smaller causes on top: v32's spawn-clearing wiped
+turrets next to spawn points (the pillboxes flank the enemy HQ, which sits
+near the top spawns — so I was demolishing them myself), and the survivors
+shared the army-wide fire budget, so with a dozen tanks alive their turn
+never came. A pillbox now keeps its own cadence.
+
+**Tanks moved unnaturally, and it was my own fix.** v32 made the corner-slide
+validate exactly the point it moved to — correct, but the move became purely
+*lateral*: a tank pressing right into a wall slid straight up or down with no
+forward progress, which reads as crabbing along the wall. The slip is now
+diagonal, as it was always meant to be: forward *and* sideways, validated at
+that same point. This is what made enemies look dumb, too — they navigate
+mazes constantly. Measured on an identical 16-battle run: deaths 10/16 → 3/16,
+wins 38% → 81%.
+
+**Your wingman is violet.** It was `#6fd3ff`, which is exactly the scout
+enemy's colour — friend and foe were the same shade. Violet is the one free
+slot in the palette (you are green, enemies are warm), plus a pulsing ring
+under the hull so it reads instantly in a crowd.
+
+**The campaign map fills the screen.** It was a 960×540 island at the top of
+the page: on a large monitor half the screen was empty and the sector labels
+were 11 px. Same treatment as the hangar — full viewport height, text scaling
+with the display.
+
+**Round length: measured, and here is the honest answer.** Rounds are 38.9 s
+and I could not stretch them further without breaking the game. Four levers
+were tried against a controlled 16-battle run:
+
+| change | round | wins | deaths |
+|---|---|---|---|
+| roster 15+2×tier | 45.8 s | 38% | 10/16 |
+| after the movement fix | 37.5 s | 81% | 3/16 |
+| enemy HP ×2.0 | 35.5 s | 6% | 15/16 |
+| HP ×1.9 + slower army fire | **38.9 s** | 44% | 9/16 |
+| HP ×2.7 + slower still | 39.1 s | 6% | 15/16 |
+
+The pattern is the same every time: **a round ends when the player dies, so
+anything that raises enemy lethality makes rounds shorter, not longer.** More
+bodies and tougher bodies both do that. What worked — longer time-to-kill paid
+for with a slower army-wide fire rate — gains 16% of length and saturates
+immediately after. Getting to 90 s honestly needs either roughly twice the
+tanks per round (about 55, which was rejected as a mob) or a round with a
+clock rather than a kill count. Defense mode already is the latter: five waves
+of 22 s each, ~110 s.
+
+**`node tools/balance.js`** now lives in the repository alongside the tests —
+that table is reproducible, and the bot uses the game's own pathfinding so the
+measurement reflects the balance rather than the bot's incompetence.
+
 ## v33 — the wingman got a brain
 
 v32 fixed the ally's *stats* and left its head alone, so it still earned the
