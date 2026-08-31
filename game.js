@@ -2329,25 +2329,88 @@ function updateHelper(dt) {
   for (const h of (battle.helpers || [])) updateOneHelper(h, dt);
 }
 
+// Пріоритети союзника. Раніше він просто їхав на НАЙБЛИЖЧОГО ворога через усю
+// карту — кидав гравця, тер об стіни й проїжджав повз трофеї. Тепер порядок
+// такий: не відбитись від тебе → забрати коробку → прикрити базу → бити ворога.
+function helperGoal(h) {
+  const dp = Math.hypot(player.x - h.x, player.y - h.y);
+
+  // Коробка йде ПЕРШОЮ, інакше повідець «не відходь від гравця» розвертав
+  // союзника на підході й він кружляв поруч із трофеєм, не беручи його
+  // (заміряно: під'їжджав на 56 px і йшов назад). Щоб не тягнути його через
+  // усю карту, коробка має бути близькою і до нього, і до гравця.
+  let bestD = null, bdd = 210;
+  for (const d of drops) {
+    if (d.dead) continue;
+    const dd = Math.hypot(d.x - h.x, d.y - h.y);
+    if (dd < bdd && Math.hypot(d.x - player.x, d.y - player.y) < 380) { bdd = dd; bestD = d; }
+  }
+  if (bestD) return { x: bestD.x, y: bestD.y, kind: 'loot' };
+
+  if (dp > 300) return { x: player.x, y: player.y, kind: 'player' };
+
+  // в обороні база важливіша за фраг: ловимо того, хто до неї підбирається
+  if (battle.mode === 'defense' && battle.homeR !== undefined) {
+    const bx = battle.homeC * TILE + TILE / 2, by = battle.homeR * TILE + TILE / 2;
+    let guard = null, gd = 260;
+    for (const e of enemies) {
+      if (e.dead || e.spawning > 0) continue;
+      const d = Math.hypot(e.x - bx, e.y - by);
+      if (d < gd) { gd = d; guard = e; }
+    }
+    if (guard) return { x: guard.x, y: guard.y, kind: 'enemy', tgt: guard };
+  }
+
+  let tgt = null, bd = 420;
+  for (const e of enemies) {
+    if (e.dead || e.spawning > 0) continue;
+    const d = Math.hypot(e.x - h.x, e.y - h.y);
+    if (d < bd) { bd = d; tgt = e; }
+  }
+  if (tgt) return { x: tgt.x, y: tgt.y, kind: 'enemy', tgt };
+
+  // нема кого бити — тримається біля тебе, але не впритул, щоб не підпирати
+  return dp < 90 ? null : { x: player.x, y: player.y, kind: 'player' };
+}
+
 function updateOneHelper(h, dt) {
   if (!h || h.dead) return;
   if (h.flash > 0) h.flash -= dt;
   h.thinkTimer -= dt;
-  // ціль — найближчий живий ворог
+
+  // ціль для СТРІЛЬБИ — завжди найближчий ворог, незалежно від того, куди їде
   let tgt = null, bd = 1e9;
   for (const e of enemies) {
     if (e.dead || e.spawning > 0) continue;
     const d = Math.hypot(e.x - h.x, e.y - h.y);
     if (d < bd) { bd = d; tgt = e; }
   }
+
   if (h.thinkTimer <= 0) {
-    h.thinkTimer = 320 + Math.random() * 500;
-    const tx = tgt ? tgt.x : player.x, ty = tgt ? tgt.y : player.y;
-    const dx = tx - h.x, dy = ty - h.y;
-    h.wantDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    h.thinkTimer = 260 + Math.random() * 340;
+    const goal = helperGoal(h);
+    h.goalKind = goal ? goal.kind : 'hold';
+    if (goal) {
+      const dx = goal.x - h.x, dy = goal.y - h.y;
+      // основна вісь — більша різниця, запасна — інша: коли впремось у стіну,
+      // є куди звернути замість тертя об ту саму цеглу
+      const prim = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      const sec = Math.abs(dx) > Math.abs(dy) ? (dy > 0 ? 'down' : 'up') : (dx > 0 ? 'right' : 'left');
+      h.wantDir = prim; h.altDir = sec;
+    } else {
+      h.wantDir = null;
+    }
   }
-  if (!moveTank(h, h.wantDir || 'up', h.speed * (battle.speedMult || 1))) h.thinkTimer = 0;
-  else h.tread += h.speed;
+
+  if (h.wantDir) {
+    const step = h.speed * (battle.speedMult || 1);
+    if (!moveTank(h, h.wantDir, step)) {
+      // впершись — одразу пробуємо запасну вісь, а не чекаємо нового «думання»
+      if (!h.altDir || !moveTank(h, h.altDir, step)) h.thinkTimer = 0;
+      else h.tread += h.speed;
+    } else h.tread += h.speed;
+  }
+
   h.turretAngle = DIR_ANGLE[h.dir];
   h.cooldown -= dt;
   if (tgt && bd < 460 && h.cooldown <= 0) {
