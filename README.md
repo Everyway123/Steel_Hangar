@@ -84,19 +84,19 @@ each bigger than the last, 85% of them driving at your ★.
 
 </td><td>
 
-### 🗺 One screen, packed
-No camera, no scrolling — the whole battlefield is in front of
-you, and up to thirteen enemy tanks are on it. Bushes hide you.
-Barrels chain-explode. Ice makes you drift. Walls take three
-shots, not one.
+### ⚔ Difficulty that reads your build
+Enemies scale with how strong your tank actually is, not with
+its tier number — so a maxed tank meets maxed enemies instead
+of becoming immortal. And the ★ works like the original Battle
+City: faster shell, then more damage, then a second barrel.
 
 </td></tr>
 <tr><td>
 
 ### 🤝 A wingman from the first second
-An allied tank rolls out with you — 60% of your health,
-70% of your damage, and it pulls fire off you. That's what
-makes the enemy count fair. A rare crate brings a second one.
+An allied medium rolls out with you — 75% of your health,
+80% of your damage — and it fetches crates and stars, applying
+them to **you**. A rare crate brings a second one.
 
 </td><td>
 
