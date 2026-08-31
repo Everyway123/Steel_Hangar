@@ -2373,6 +2373,46 @@ function helperGoal(h) {
   return dp < 90 ? null : { x: player.x, y: player.y, kind: 'player' };
 }
 
+// Пошук шляху для союзника. Жадібний рух принципово не огинає перешкоду:
+// упершись, він переобирає той самий напрямок і тупцює (заміряно — зупинявся
+// за 78–158 px від коробки за стіною, 2 прогони з 5). Поле всього 16×14, тож
+// повний BFS кілька разів на секунду коштує копійки і дає справжній маршрут.
+// Танки в графі не враховуємо: вони роз'їжджаються самі.
+function pathDir(h, gx, gy) {
+  const sc = Math.floor(h.x / TILE), sr = Math.floor(h.y / TILE);
+  const tc = Math.floor(gx / TILE), tr = Math.floor(gy / TILE);
+  if (sr === tr && sc === tc) return null;
+  const start = sr * COLS + sc, goal = tr * COLS + tc;
+  const prev = new Int16Array(ROWS * COLS).fill(-1);
+  const seen = new Uint8Array(ROWS * COLS);
+  seen[start] = 1;
+  const q = [start];
+  let found = -1;
+  for (let qi = 0; qi < q.length && found < 0; qi++) {
+    const cur = q[qi], r = (cur / COLS) | 0, c = cur % COLS;
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+      const idx = nr * COLS + nc;
+      if (seen[idx]) continue;
+      if (!rectFree(nc * TILE + TILE / 2, nr * TILE + TILE / 2, h.size, false)) continue;
+      seen[idx] = 1; prev[idx] = cur;
+      if (idx === goal) { found = idx; break; }
+      q.push(idx);
+    }
+  }
+  if (found < 0) return null;
+  let cur = found;
+  while (prev[cur] !== start && prev[cur] !== -1) cur = prev[cur];
+  if (prev[cur] === -1) return null;
+  const nr = (cur / COLS) | 0, nc = cur % COLS;
+  if (nr < sr) return 'up';
+  if (nr > sr) return 'down';
+  if (nc < sc) return 'left';
+  if (nc > sc) return 'right';
+  return null;
+}
+
 function updateOneHelper(h, dt) {
   if (!h || h.dead) return;
   if (h.flash > 0) h.flash -= dt;
@@ -2392,24 +2432,55 @@ function updateOneHelper(h, dt) {
     h.goalKind = goal ? goal.kind : 'hold';
     if (goal) {
       const dx = goal.x - h.x, dy = goal.y - h.y;
-      // основна вісь — більша різниця, запасна — інша: коли впремось у стіну,
-      // є куди звернути замість тертя об ту саму цеглу
+      // основна вісь — більша різниця, запасна — інша
       const prim = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       const sec = Math.abs(dx) > Math.abs(dy) ? (dy > 0 ? 'down' : 'up') : (dx > 0 ? 'right' : 'left');
-      h.wantDir = prim; h.altDir = sec;
+      // маршрут із BFS головніший за жадібний напрямок; жадібний лишається
+      // запасним, коли цілі не видно в графі (наприклад, вона в стіні)
+      const routed = pathDir(h, goal.x, goal.y);
+      h.wantDir = routed || prim;
+      h.altDir = routed ? prim : sec;
+      if (routed) h.detourMs = 0;
     } else {
       h.wantDir = null;
     }
   }
 
-  if (h.wantDir) {
-    const step = h.speed * (battle.speedMult || 1);
-    if (!moveTank(h, h.wantDir, step)) {
-      // впершись — одразу пробуємо запасну вісь, а не чекаємо нового «думання»
-      if (!h.altDir || !moveTank(h, h.altDir, step)) h.thinkTimer = 0;
-      else h.tread += h.speed;
-    } else h.tread += h.speed;
+  const step = h.speed * (battle.speedMult || 1);
+
+  // Обхід стіни. Жадібний рух сам по собі не вміє огинати перешкоду: упершись,
+  // він переобирає той самий напрямок і тупцює на місці (заміряно — союзник
+  // зупинявся за 158 px від коробки за стіною). Тому після двох блокувань
+  // поспіль він комітиться в перпендикулярний бік і тримає його ~600 мс —
+  // цього вистачає, щоб обійти кут і знову побачити пряму дорогу.
+  if (h.detourMs > 0) {
+    h.detourMs -= dt;
+    if (moveTank(h, h.detourDir, step)) h.tread += h.speed;
+    else h.detourMs = 0;
+    return finishHelper(h, dt, tgt, bd);
   }
+
+  if (h.wantDir) {
+    if (moveTank(h, h.wantDir, step)) { h.tread += h.speed; h.blocked = 0; }
+    else if (h.altDir && moveTank(h, h.altDir, step)) { h.tread += h.speed; h.blocked = 0; }
+    else {
+      h.blocked = (h.blocked || 0) + 1;
+      if (h.blocked >= 2) {
+        const perp = h.wantDir === 'up' || h.wantDir === 'down'
+          ? ['left', 'right'] : ['up', 'down'];
+        h.detourDir = perp[Math.random() < 0.5 ? 0 : 1];
+        if (!moveTank(h, h.detourDir, step)) h.detourDir = perp[h.detourDir === perp[0] ? 1 : 0];
+        h.detourMs = 600;
+        h.blocked = 0;
+      }
+      h.thinkTimer = 0;
+    }
+  }
+  return finishHelper(h, dt, tgt, bd);
+}
+
+// стрільба союзника — окремо від руху: він б'є навіть коли їде по трофей
+function finishHelper(h, dt, tgt, bd) {
 
   h.turretAngle = DIR_ANGLE[h.dir];
   h.cooldown -= dt;

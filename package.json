@@ -1,5 +1,17 @@
 {
-  "dependencies": {
+  "name": "steel-hangar",
+  "version": "32.0.0",
+  "description": "Battle City meets tank-progression RPG: two-minute rounds, fourteen tanks, twenty-five field crates. Vanilla JS, zero runtime dependencies.",
+  "license": "MIT",
+  "homepage": "https://everyway123.github.io/Steel_Hangar/",
+  "repository": { "type": "git", "url": "https://github.com/Everyway123/Steel_Hangar.git" },
+  "private": true,
+  "scripts": {
+    "test": "node tests/regression.js",
+    "build": "node tools/bundle.js"
+  },
+  "//": "Гра не має залежностей часу виконання — playwright потрібен лише для регресії.",
+  "devDependencies": {
     "playwright": "^1.62.1"
   }
 }

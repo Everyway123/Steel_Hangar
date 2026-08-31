@@ -238,11 +238,17 @@ BLOCKS.ally = async browser => {
     enemies.length = 0; spawnQueue.length = 0;
     const h = battle.helpers[0];
     drops.length = 0;
+    // Коробка має стояти в ДОСЯЖНОМУ місці: перша ж вільна клітина може
+    // виявитись замкненою кишенею, і тоді тест міряв би не розум союзника,
+    // а те, чи існує маршрут узагалі (саме на цьому він і блимав).
     let spot = null;
     for (let r = 1; r < ROWS - 1 && !spot; r++) for (let c = 1; c < COLS - 1; c++) {
       const x = c * TILE + TILE / 2, y = r * TILE + TILE / 2;
       const d = Math.hypot(x - h.x, y - h.y);
-      if (d > 110 && d < 190 && rectFree(x, y, 30, false)) { spot = { x, y }; break; }
+      if (d > 110 && d < 190 && rectFree(x, y, h.size, false) &&
+          Math.hypot(x - player.x, y - player.y) < 360 && pathDir(h, x, y)) {
+        spot = { x, y }; break;
+      }
     }
     if (!spot) return { none: true };
     drops.push({ x: spot.x, y: spot.y, kind: 'twin', ttl: 30000, dead: false });
@@ -259,13 +265,16 @@ BLOCKS.ally = async browser => {
   t('союзник ЗАБИРАЄ коробку і віддає бонус гравцю', !loot.none && loot.got,
     loot.none ? 'нема вільного місця' : `${loot.d0.toFixed(0)} → ${loot.dmin.toFixed(0)}px`);
 
+  // без ворогів: тут міряється рухливість, а не бойова живучість — інакше
+  // тест блимав, коли союзник гинув на початку і «проїхав» виходило мало
   const move = await page.evaluate(async () => {
     startBattle({ id: null, name: 't', map: 'Міські руїни', mode: 'clear', mod: null });
+    enemies.length = 0; spawnQueue.length = 0;
     const h = battle.helpers[0];
     let path = 0, px = h.x, py = h.y;
     for (let i = 0; i < 200; i++) {
       await new Promise(r => setTimeout(r, 12));
-      if (h.dead) break;
+      enemies.length = 0;
       path += Math.hypot(h.x - px, h.y - py); px = h.x; py = h.y;
     }
     return path;
