@@ -4,6 +4,28 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v36 — the music finally has a tune
+
+The soundtrack had harmony but no **theme**. The lead voice walked the chord
+tones through a single eight-step pattern that repeated identically every bar,
+so however the chords moved underneath, the melody was wallpaper. The bass hit
+the root on every other eighth and never moved; the drums played kick-on-1-and-3
+for the entire battle.
+
+Each of the six tracks now has a written **four-bar motif** — semitone offsets
+relative to the chord root, so it transposes with the harmony and never goes
+sour — with rests, phrasing, and a longer note wherever a rest follows. Under
+it: a bass line with octave jumps instead of a pedal, sixteenth-note arpeggios
+on the battle tracks (the classic chiptune shimmer that was missing entirely),
+velocity accents on the strong beats, and a snare fill closing every fourth bar
+so the rhythm breathes instead of ticking like a metronome.
+
+Verified two ways, because "sounds better" is not a measurement: the motifs are
+checked structurally (32 steps, at least three distinct bars out of four, real
+rests, four or more distinct pitches), and an `AnalyserNode` listens to the
+battle track for real — 7 distinct dominant frequencies across 150–2000 Hz,
+against 1 before.
+
 ## v35 — three lives, and the round finally doubled
 
 Rounds were 38.9 s and every attempt to stretch them made things worse. The

@@ -614,13 +614,76 @@ const P_HEAVY = [ // Em — C — G — D, повільно і низько
   { bass: 5,  tones: [5, 9,  12, 17] },
 ];
 
+// МЕЛОДІЇ. Раніше ведучий голос просто ходив по нотах акорду за одним
+// 8-кроковим шаблоном, який повторювався кожен такт — тому музика й звучала
+// як шпалери: гармонія була, а теми не було. Тепер у кожного треку свій
+// мотив на ЧОТИРИ такти (32 вісімки) з паузами і фразуванням.
+// Числа — півтони відносно басу акорду, тож мотив сам транспонується за
+// гармонією і не фальшивить. null — пауза, і саме паузи роблять фразу фразою.
+const R = null;
+const MEL = {
+  // Am—F—C—G: підйом, відповідь, кульмінація, спуск
+  drive: [
+    12, R, 12, 15, 19, R, 15, 12,
+    10, R, 10, 12, 15, R, 12, 10,
+    12, 15, 19, 24, R, 19, 15, 12,
+    19, R, 17, R, 15, 14, 12, R,
+  ],
+  // Dm—Bb—Gm—A: наполегливе повторення однієї ноти — відчуття тиску
+  press: [
+    12, 12, R, 15, 12, R, 17, 15,
+    12, 12, R, 15, 17, R, 19, 17,
+    24, R, 22, 19, 17, R, 15, 12,
+    14, R, 12, R, 11, R, 12, R,
+  ],
+  // хроматика: рідкі високі ноти, що повзуть униз — тривога
+  dread: [
+    24, R, R, 23, R, R, 22, R,
+    R, 21, R, R, 20, R, R, 19,
+    12, R, 24, R, 12, R, 23, R,
+    R, R, 22, 21, 20, 19, 18, R,
+  ],
+  // C—G—Am—F: фанфара
+  bright: [
+    12, 15, 19, 24, R, 24, 19, 15,
+    19, R, 19, 22, 24, R, 22, 19,
+    24, R, 22, 19, 15, R, 19, 22,
+    24, 24, R, 19, 15, 12, R, R,
+  ],
+  // Em—C—G—D: повільна важка тема боса
+  heavy: [
+    12, R, R, R, 15, R, R, R,
+    14, R, R, 12, R, R, 10, R,
+    19, R, R, R, 17, R, 15, R,
+    12, R, 10, R, 7, R, R, R,
+  ],
+  // ангар: майже тиша, кілька нот на такт
+  calm: [
+    12, R, R, 16, R, R, 19, R,
+    R, 16, R, R, 12, R, R, R,
+    19, R, R, 21, R, 19, R, 16,
+    12, R, R, R, R, R, R, R,
+  ],
+};
+
+// Бас: півтони від тоніки акорду, null — пауза. Раніше бас бив саму тоніку
+// на кожну парну вісімку і нікуди не рухався.
+const BASS = {
+  drive:  [0, R, 0, R, 12, R, 0, 7],
+  press:  [0, 0, R, 0, 7, R, 0, 0],
+  dread:  [0, R, R, 0, R, 0, R, 7],
+  bright: [0, R, 7, R, 12, R, 7, R],
+  heavy:  [0, R, R, R, 7, R, R, R],
+  calm:   [0, R, R, R, R, R, R, R],
+};
+
 const TRACKS = {
-  hangar:  { bpm: 92,  voice: 'organ', wet: 0.9,  drums: 0, prog: P_CALM,   ost: [0, 2, 1, 3, 2, 1, 3, 2], lvl: 0.65 },
-  battle:  { bpm: 132, voice: 'chip',  wet: 0.22, drums: 1, prog: P_DRIVE,  ost: [0, 1, 2, 1, 3, 2, 1, 0], lvl: 1 },
-  pressure:{ bpm: 152, voice: 'chip',  wet: 0.18, drums: 2, prog: P_MINOR,  ost: [0, 3, 2, 3, 1, 3, 2, 3], lvl: 1.1 },
-  danger:  { bpm: 164, voice: 'chip',  wet: 0.3,  drums: 2, prog: P_TENSE,  ost: [0, 1, 0, 2, 0, 1, 0, 3], lvl: 1.15 },
-  victory: { bpm: 126, voice: 'chip',  wet: 0.35, drums: 1, prog: P_BRIGHT, ost: [0, 2, 3, 2, 1, 2, 3, 2], lvl: 1.05 },
-  boss:    { bpm: 104, voice: 'organ', wet: 0.8,  drums: 2, prog: P_HEAVY,  ost: [0, 0, 1, 0, 2, 0, 1, 0], lvl: 1.1 },
+  hangar:  { bpm: 92,  voice: 'organ', wet: 0.9,  drums: 0, prog: P_CALM,   mel: MEL.calm,   bass: BASS.calm,   lvl: 0.65 },
+  battle:  { bpm: 132, voice: 'chip',  wet: 0.22, drums: 1, prog: P_DRIVE,  mel: MEL.drive,  bass: BASS.drive,  lvl: 1,    arp: 1 },
+  pressure:{ bpm: 152, voice: 'chip',  wet: 0.18, drums: 2, prog: P_MINOR,  mel: MEL.press,  bass: BASS.press,  lvl: 1.1,  arp: 1 },
+  danger:  { bpm: 164, voice: 'chip',  wet: 0.3,  drums: 2, prog: P_TENSE,  mel: MEL.dread,  bass: BASS.dread,  lvl: 1.15 },
+  victory: { bpm: 126, voice: 'chip',  wet: 0.35, drums: 1, prog: P_BRIGHT, mel: MEL.bright, bass: BASS.bright, lvl: 1.05, arp: 1 },
+  boss:    { bpm: 104, voice: 'organ', wet: 0.8,  drums: 2, prog: P_HEAVY,  mel: MEL.heavy,  bass: BASS.heavy,  lvl: 1.1 },
 };
 
 // Яка музика доречна прямо зараз
@@ -792,6 +855,12 @@ function musicStep(i, t, eighth) {
   const arc = 0.5 + 0.5 * (bar / 16);
   const lvl = arc * tr.lvl;
 
+  // мотив довжиною чотири такти — саме він робить музику темою, а не фоном
+  const mel = tr.mel ? tr.mel[i % 32] : null;
+  const bassOff = tr.bass ? tr.bass[e] : (e % 2 === 0 ? 0 : null);
+  // акцент на сильні долі: без різниці гучності фраза звучить механічно
+  const acc = (e === 0 ? 1.25 : e === 4 ? 1.1 : 1);
+
   if (tr.voice === 'organ') {
     if (e === 0) {
       for (let k = 0; k < 4; k++) {
@@ -801,26 +870,48 @@ function musicStep(i, t, eighth) {
       }
       organNote(NOTE(chord.bass) / 2, t, eighth * 8.6, 0.07 * lvl, ORGAN_PAD, false, 0.5);
     }
-    const oct = bar % 8 < 4 ? 24 : 36;
-    const semi = chord.tones[tr.ost[e] % chord.tones.length];
-    organNote(NOTE(semi + oct - 12), t, eighth * 1.9, 0.05 * lvl, ORGAN_PLUCK, false, 0.012);
+    if (mel !== null && mel !== undefined) {
+      const oct = bar % 8 < 4 ? 12 : 24;
+      organNote(NOTE(chord.bass + mel + oct), t, eighth * 2.6, 0.055 * lvl * acc, ORGAN_PLUCK, false, 0.012);
+    }
   } else {
-    // 8-бітний шар: бас квадратом, ведучий голос вісімками, підголосок трикутником
-    if (e % 2 === 0) chipNote(NOTE(chord.bass) / 2, t, eighth * 1.7, 0.075 * lvl, 'square');
-    const semi = chord.tones[tr.ost[e] % chord.tones.length];
-    chipNote(NOTE(semi + 12), t, eighth * 0.85, 0.055 * lvl, 'square');
-    if (e === 0 || e === 5) chipNote(NOTE(chord.tones[1] + 24), t, eighth * 1.4, 0.03 * lvl, 'triangle');
+    // БАС — квадратом, за власним малюнком зі стрибками в октаву
+    if (bassOff !== null && bassOff !== undefined) {
+      chipNote(NOTE(chord.bass + bassOff) / 2, t, eighth * 1.6, 0.08 * lvl * acc, 'square');
+    }
+    // ВЕДУЧИЙ ГОЛОС — мотив; довша нота там, де далі пауза (природне фразування)
+    if (mel !== null && mel !== undefined) {
+      const nextRest = tr.mel[(i + 1) % 32] === null;
+      chipNote(NOTE(chord.bass + mel + 12), t, eighth * (nextRest ? 1.7 : 0.85),
+        0.06 * lvl * acc, 'square');
+    }
+    // АРПЕДЖІО — шістнадцятими по нотах акорду: класичний чиптюновий блиск,
+    // саме його бракувало, щоб трек не звучав порожньо між нотами мелодії
+    if (tr.arp) {
+      for (let k = 0; k < 2; k++) {
+        const semi = chord.tones[(i * 2 + k) % chord.tones.length];
+        chipNote(NOTE(semi + 24), t + eighth * 0.5 * k, eighth * 0.4, 0.018 * lvl, 'triangle');
+      }
+    }
   }
 
-  // барабани: 0 — нема, 1 — базовий біт, 2 — щільний
+  // БАРАБАНИ: 0 — нема, 1 — базовий біт, 2 — щільний. Кожен четвертий такт
+  // закінчується збивкою — без неї ритм не дихав і слухався як метроном.
   if (tr.drums && music.dry) {
-    if (e === 0 || e === 4) drumKick(t, 0.13 * lvl);
+    const fill = bar % 4 === 3 && e >= 6;
+    if (e === 0 || e === 4) drumKick(t, 0.13 * lvl * acc);
     if (e === 2 || e === 6) drumNoise(t, 0.09, 1800, 'bandpass', 0.055 * lvl);
     if (tr.drums === 2) {
       drumNoise(t, 0.03, 8000, 'highpass', 0.022 * lvl);
       if (e === 7) drumKick(t + eighth * 0.5, 0.1 * lvl);
     } else if (e % 2 === 1) {
       drumNoise(t, 0.025, 8000, 'highpass', 0.014 * lvl);
+    }
+    if (fill) {
+      // здвоєний малий барабан шістнадцятими — підводка до наступного такту
+      drumNoise(t, 0.05, 2400, 'bandpass', 0.05 * lvl);
+      drumNoise(t + eighth * 0.5, 0.05, 2800, 'bandpass', 0.06 * lvl);
+      if (e === 7) drumNoise(t + eighth * 0.75, 0.04, 3400, 'bandpass', 0.07 * lvl);
     }
   }
 }
@@ -4317,7 +4408,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v35 · три життя — раунд подвоївся';
+const GAME_VERSION = 'v36 · три життя, довші раунди й музика з темою';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();

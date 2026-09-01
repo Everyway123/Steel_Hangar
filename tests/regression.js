@@ -138,6 +138,61 @@ BLOCKS.spawn = async browser => {
   await page.close();
 };
 
+// Музика звучала як шпалери: гармонія була, а ТЕМИ не було — ведучий голос
+// ходив по нотах акорду за одним 8-кроковим шаблоном, однаковим у кожному такті.
+BLOCKS.music = async browser => {
+  const { page, errs } = await fresh(browser, { turbo: false });
+
+  const tracks = await page.evaluate(() => Object.entries(TRACKS).map(([name, tr]) => {
+    const notes = tr.mel.filter(x => x !== null && x !== undefined);
+    const bars = [0, 1, 2, 3].map(k => tr.mel.slice(k * 8, k * 8 + 8).join(','));
+    return {
+      name, len: tr.mel.length, rests: tr.mel.length - notes.length,
+      uniq: new Set(notes).size, uniqBars: new Set(bars).size,
+      bassUniq: new Set(tr.bass.filter(x => x !== null)).size,
+    };
+  }));
+
+  for (const x of tracks) {
+    t(`${x.name}: мотив на 4 такти, такти різні`, x.len === 32 && x.uniqBars >= 3,
+      `${x.len} кроків, різних тактів ${x.uniqBars}/4`);
+    t(`${x.name}: є паузи і рух висоти`, x.rests >= 4 && x.uniq >= 4,
+      `пауз ${x.rests}, різних висот ${x.uniq}`);
+  }
+  t('бас рухається щонайменше у 4 треках',
+    tracks.filter(x => x.bassUniq >= 2).length >= 4);
+
+  // і найголовніше — що воно СПРАВДІ звучить і висота міняється на слух,
+  // а не лише в таблицях: слухаємо власним аналізатором
+  const heard = await page.evaluate(async () => {
+    ensureAudio();
+    startMusic();
+    if (typeof audioCtx === 'undefined' || !audioCtx) return { noCtx: true };
+    await audioCtx.resume();
+    music.track = 'battle'; music.mode = 'battle';
+    const an = audioCtx.createAnalyser();
+    an.fftSize = 4096;
+    music.master.connect(an);
+    const buf = new Float32Array(an.frequencyBinCount);
+    const hz = audioCtx.sampleRate / an.fftSize;
+    const lo = Math.floor(150 / hz), hi = Math.ceil(2000 / hz);
+    const peaks = [];
+    for (let i = 0; i < 80; i++) {
+      await new Promise(r => setTimeout(r, 70));
+      an.getFloatFrequencyData(buf);
+      let best = -Infinity, bi = -1;
+      for (let k = lo; k < hi; k++) if (buf[k] > best) { best = buf[k]; bi = k; }
+      if (bi >= 0 && best > -85) peaks.push(Math.round(bi * hz));
+    }
+    return { uniq: new Set(peaks).size, n: peaks.length };
+  });
+  t('трек справді звучить', !heard.noCtx && heard.n > 30, `замірів зі звуком ${heard.n}`);
+  t('висота реально міняється, а не стоїть', heard.uniq >= 5, `різних домінант ${heard.uniq}`);
+
+  t('без помилок сторінки', errs.length === 0, errs[0] || '');
+  await page.close();
+};
+
 // Раунд закінчувався щойно гравець гинув — половина боїв обривалась на 30-й
 // секунді. Життя знімають цю стелю, але смерть має лишатись дорогою.
 BLOCKS.lives = async browser => {
