@@ -4,6 +4,44 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v35 — three lives, and the round finally doubled
+
+Rounds were 38.9 s and every attempt to stretch them made things worse. The
+measurements said why, and I had been reading them without seeing it: **the
+round ended when the player died**, in nine battles out of sixteen. Everything
+that made enemies more dangerous therefore made rounds *shorter*.
+
+So the fix is not enemy tuning at all — it is the part of the original Battle
+City that actually fits this game: **three lives**. Death still costs
+everything you were carrying (all field crates are stripped) and respawns you
+on your own base with a 2.5 s shield, but it no longer ends the battle at the
+thirty-second mark.
+
+That immediately bought the headroom every earlier attempt lacked, so enemy
+toughness could finally go up instead of down:
+
+| | round | wins | lost battles |
+|---|---|---|---|
+| v34, no lives | 38.9 s | 44% | 9/16 |
+| lives, enemy HP ×1.9 | 62.5 s | 94% | 1/16 |
+| lives, HP ×2.4 | 81.7 s | 63% | 6/16 |
+| lives, HP ×2.8 | 93.5 s | 19% | 11/16 |
+| **lives, HP ×2.55** | **83.0 s** | **69%** | **3/16** |
+
+Rounds went from 38.9 s to 83.0 s — more than double — and the enemy is
+tougher than at any point before, not weaker.
+
+**The wingman picks its target by your position, not its own.** Its hunting
+radius (420 px) was larger than its leash (300 px), so it oscillated between
+the two: measured 43% of a battle spent more than 380 px away from you. It now
+only engages enemies within 360 px **of you**, so it fights in your fight.
+Measured after: 0–12% of the time far, over five consecutive runs.
+
+Two flaky checks in my own suite were fixed honestly rather than loosened. One
+measured the ally's mobility with no enemies and no crates nearby — where it
+correctly *holds position* — and then blamed the AI for standing still. The
+other is the leash test above, which was right to complain.
+
 ## v34 — the pillboxes had never fired, and tanks moved like crabs
 
 **The enemy pillboxes have been silent since the day they were added.**

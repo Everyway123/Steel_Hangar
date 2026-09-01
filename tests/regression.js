@@ -138,6 +138,45 @@ BLOCKS.spawn = async browser => {
   await page.close();
 };
 
+// Раунд закінчувався щойно гравець гинув — половина боїв обривалась на 30-й
+// секунді. Життя знімають цю стелю, але смерть має лишатись дорогою.
+BLOCKS.lives = async browser => {
+  const { page, errs } = await fresh(browser);
+
+  const start = await page.evaluate(() => {
+    startBattle({ id: null, name: 't', map: 'Полігон', mode: 'clear', mod: null });
+    return { lives: battle.lives, max: LIVES };
+  });
+  t('бій починається з трьома життями', start.lives === 3 && start.max === 3, `${start.lives}`);
+
+  const died = await page.evaluate(() => {
+    startBattle({ id: null, name: 't', map: 'Полігон', mode: 'clear', mod: null });
+    applyCrate(player, 'twin');
+    const buffs0 = player.buffs.length;
+    player.hp = 0;
+    playerDied();
+    return { lives: battle.lives, state, hp: player.hp, maxHp: player.maxHp,
+      invuln: player.invuln, buffs0, buffs: player.buffs.length,
+      stuck: blockedCorners(player.x, player.y, player.size) };
+  });
+  t('перша смерть не завершує бій', died.state === 'play' && died.lives === 2, `життів ${died.lives}`);
+  t('після відродження повний HP і щит', died.hp === died.maxHp && died.invuln > 0,
+    `${died.hp}/${died.maxHp}, щит ${died.invuln}мс`);
+  t('смерть коштує набутих трофеїв', died.buffs0 > 0 && died.buffs === 0,
+    `${died.buffs0} → ${died.buffs}`);
+  t('відродження не в стіні', died.stuck === 0, `кутів у стіні ${died.stuck}`);
+
+  const over = await page.evaluate(() => {
+    startBattle({ id: null, name: 't', map: 'Полігон', mode: 'clear', mod: null });
+    playerDied(); playerDied(); playerDied();
+    return { lives: battle ? battle.lives : null, state };
+  });
+  t('третя смерть завершує бій поразкою', over.state === 'results', `state ${over.state}`);
+
+  t('без помилок сторінки', errs.length === 0, errs[0] || '');
+  await page.close();
+};
+
 // ДОТи ворожої фортеці мовчали: clearSpawns зносив їх разом зі стінами
 // навколо точок спавну, а вцілілі ділили спільний ліміт пострілів армії,
 // і при десятку живих танків черга до них не доходила.
@@ -301,8 +340,10 @@ BLOCKS.ally = async browser => {
   t('союзник ЗАБИРАЄ коробку і віддає бонус гравцю', !loot.none && loot.got,
     loot.none ? 'нема вільного місця' : `${loot.d0.toFixed(0)} → ${loot.dmin.toFixed(0)}px`);
 
-  // без ворогів: тут міряється рухливість, а не бойова живучість — інакше
-  // тест блимав, коли союзник гинув на початку і «проїхав» виходило мало
+  // Міряємо саме РУХЛИВІСТЬ, тож союзнику потрібен привід їхати. Без ворогів
+  // і без коробок він біля гравця правильно СТОЇТЬ — і тест на цьому блимав,
+  // звинувачуючи ШІ в тому, що той поводиться як задумано. Тепер гравець
+  // тримається в дальньому кутку, і союзник має до нього дістатись.
   const move = await page.evaluate(async () => {
     startBattle({ id: null, name: 't', map: 'Міські руїни', mode: 'clear', mod: null });
     enemies.length = 0; spawnQueue.length = 0;
@@ -311,6 +352,9 @@ BLOCKS.ally = async browser => {
     for (let i = 0; i < 200; i++) {
       await new Promise(r => setTimeout(r, 12));
       enemies.length = 0;
+      // гравець «утікає» в протилежний кут — союзник має його наздоганяти
+      player.x = h.x < W / 2 ? W - TILE * 2 : TILE * 2;
+      player.y = h.y < H / 2 ? H - TILE * 2 : TILE * 2;
       path += Math.hypot(h.x - px, h.y - py); px = h.x; py = h.y;
     }
     return path;

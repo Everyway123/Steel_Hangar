@@ -1317,6 +1317,7 @@ function startBattle(sector) {
     mines: [], strikes: [], artT: 3000,
     frags: 0, dmgDealt: 0, ricochets: 0, bossKilled: false, hqLeft: 0,
     credits: 0, xp: 0,
+    lives: LIVES, deaths: 0,
     supply: 0, pts: 0, ptsTotal: 0, wave: 1, waveT: 0, medkit: true, idle: 0, farmWarned: false, arcWarned: false, reinforce: 5,
     gameMs: 0, dmgTaken: 0,
     perks: [],
@@ -1564,7 +1565,7 @@ function scaledEnemy(typeName, tier) {
   const pw = battle.power || 1;                         // і твоя власна прокачка
   // Зрізаний ростер сам по собі вкоротив раунд 88с → 65с. Щоб бій тримав час
   // без юрби, ворог має жити довше: не «більше танків», а «міцніший танк».
-  const hpMult = 1.9 * (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv) * pw;
+  const hpMult = 2.55 * (1 + 0.18 * (tier - 1)) * (1 + 0.3 * fl) * (1 + 0.22 * wv) * pw;
   const dmgAdd = (tier <= 2 ? -1 : 0) + Math.floor((tier - 1) / 2) + fl;
   return {
     type: typeName,
@@ -2109,7 +2110,7 @@ function updateBullets(dt) {
         sfx.hit();
         floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
         spawnParticles(b.x, b.y, '#39ff88', 6);
-        if (player.hp <= 0) { endBattle(false); return; }
+        if (player.hp <= 0) { playerDied(); return; }
       }
     }
 
@@ -2150,7 +2151,7 @@ function explodeBarrel(r, c) {
     battle.dmgTaken += dmg;
     player.invuln = 600;
     floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
-    if (player.hp <= 0) { endBattle(false); return; }
+    if (player.hp <= 0) { playerDied(); return; }
   }
   // руйнує сусідню цеглу і підриває сусідні бочки ланцюгом
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
@@ -2192,6 +2193,48 @@ function updateTurrets(dt) {
       bullets.push({ x: t.x + Math.cos(ang) * 24, y: t.y + Math.sin(ang) * 24, dx: Math.cos(ang), dy: Math.sin(ang), speed: 3.8, dmg: 3, fromPlayer: false });
       sfx.shoot();
       t.cd = 1500 + Math.random() * 500;
+    }
+  }
+}
+
+// ЖИТТЯ. Заміри показали, що половина боїв закінчувалась тим, що гине гравець
+// (9 смертей із 16), тож усе, що робило ворога небезпечнішим, СКОРОЧУВАЛО
+// раунд замість подовжити. Життя знімають саме цю стелю: смерть коштує дорого,
+// але не обриває бій на 30-й секунді. Як в оригінальному Battle City.
+const LIVES = 3;
+function playerDied() {
+  battle.lives = (battle.lives === undefined ? LIVES : battle.lives) - 1;
+  battle.deaths = (battle.deaths || 0) + 1;
+  spawnParticles(player.x, player.y, '#39ff88', 40);
+  sfx.boom();
+  shakeTime = 500;
+
+  if (battle.lives <= 0) { endBattle(false); return; }
+
+  // відроджуємось на власній базі, з коротким щитом і без набутих трофеїв:
+  // смерть має боліти, інакше життя перетворюють бій на нескінченний
+  const r = Math.min(ROWS - 1, (battle.homeR !== undefined ? battle.homeR : ROWS - 1) - 1);
+  const c = battle.homeC !== undefined ? battle.homeC : Math.floor(COLS / 2);
+  player.x = c * TILE + TILE / 2;
+  player.y = r * TILE + TILE / 2;
+  freeTankSpot(player);
+  player.hp = player.maxHp;
+  player.invuln = 2500;
+  player.dir = 'up';
+  player.turretAngle = -Math.PI / 2;
+  player.glide = 0; player.accelMs = 0;
+  for (const b of player.buffs.slice()) removeBuff(player, b.id);
+  flashMsg(`💥 Танк втрачено! Лишилось життів: ${battle.lives}`);
+}
+
+// звільняє клітину під танком, щоб відродження не сталось у стіні
+function freeTankSpot(t) {
+  if (rectFree(t.x, t.y, t.size, false)) return;
+  for (let rad = 1; rad <= 4; rad++) {
+    for (const [dr, dc] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+      const x = t.x + dc * rad * TILE, y = t.y + dr * rad * TILE;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      if (rectFree(x, y, t.size, false)) { t.x = x; t.y = y; return; }
     }
   }
 }
@@ -2491,7 +2534,7 @@ function modExplosion(x, y, R, dmgP, dmgE) {
     battle.dmgTaken += dmg;
     player.invuln = 600;
     floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
-    if (player.hp <= 0) endBattle(false);
+    if (player.hp <= 0) playerDied();
   }
 }
 
@@ -2840,10 +2883,14 @@ function helperGoal(h) {
     if (guard) return { x: guard.x, y: guard.y, kind: 'enemy', tgt: guard };
   }
 
-  let tgt = null, bd = 420;
+  // Ворога обираємо за відстанню ВІД ГРАВЦЯ, а не від союзника. Інакше радіус
+  // полювання (420) перевищував повідець (300) і союзника гойдало між ними:
+  // заміряно 43% часу далі ніж 380 px від тебе. Тепер він б'ється у твоєму
+  // бою, а не тікає за найближчою мішенню.
+  let tgt = null, bd = 360;
   for (const e of enemies) {
     if (e.dead || e.spawning > 0) continue;
-    const d = Math.hypot(e.x - h.x, e.y - h.y);
+    const d = Math.hypot(e.x - player.x, e.y - player.y);
     if (d < bd) { bd = d; tgt = e; }
   }
   if (tgt) return { x: tgt.x, y: tgt.y, kind: 'enemy', tgt };
@@ -3980,7 +4027,9 @@ function drawHud() {
   ctx.fillStyle = homeFrac < 0.4 ? '#ff4d5e' : '#39ff88';
   const left = `★ ${Math.round(homeFrac * 100)}%   ☭ ${battle.hqLeft}`;
   const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
-  ctx.fillText(`⚔ ${battle.frags}  ${left}${modIco}`, 10, midY);
+  // життя — найважливіше число в бою, тож стоїть першим і червоніє на останньому
+  const lives = battle.lives === undefined ? LIVES : battle.lives;
+  ctx.fillText(`${'🛡'.repeat(Math.max(0, lives))}  ⚔ ${battle.frags}  ${left}${modIco}`, 10, midY);
 
   // взяті доктрини — праворуч від лічильників
   if (battle.perks.length) {
@@ -4723,7 +4772,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v34 · ДОТи заговорили, танки їздять природно';
+const GAME_VERSION = 'v35 · три життя — раунд подвоївся';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
