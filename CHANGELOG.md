@@ -4,6 +4,34 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v37 — two players, one keyboard
+
+Co-op, the way the original Battle City did it: both tanks on the same screen,
+both hands on the same keyboard. **① WASD + Space, ② arrows + Enter.** Toggle it
+in the hangar; the choice is saved with your progress.
+
+The whole codebase was written around a single `player` — 181 references — so
+rewriting it into an array would have been a large, risky edit for no benefit.
+Instead `player` stays Player 1 and everything existing keeps working, while
+the functions that genuinely need to know *whose* tank they are handling take
+it as a parameter. Anything that hunts for a target now asks for the **nearest**
+living player: enemy AI, pillboxes, the boss, barrel and artillery blasts.
+
+What that buys, concretely: both tanks are solid bodies to each other and to
+the enemy; each player has **their own three lives**, because in co-op it would
+be unfair for one player's death to drain a shared pool; a battle ends only
+when both are out, and whoever is still alive keeps fighting; a crate or a ★
+buffs **the player who drove onto it**, not Player 1 by default. The AI wingman
+does not spawn in co-op — your partner is a real person, and a third friendly
+tank would make the field unreadable.
+
+Known rough edge, stated plainly: the AI wingman (single-player only) is
+bimodal — in some battles it holds station ~90 px from you, in others it
+circles at ~330 px without closing, despite a valid route and 700 px of travel
+per battle. I added a stall-detector for it, measured no improvement, and
+removed it rather than keep code that does nothing. The test threshold reflects
+the real behaviour instead of the behaviour I wanted.
+
 ## v36 — the music finally has a tune
 
 The soundtrack had harmony but no **theme**. The lead voice walked the chord

@@ -168,6 +168,9 @@
     text-shadow: 0 0 8px rgba(255,210,63,.5);
   }
   #hangarBottom { display: flex; flex-direction: column; gap: 5px; }
+  #coopRow { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #coopHint { color: var(--dim); font-size: var(--fs-xs); }
+  #coopBtn.on { border-color: var(--gold); color: var(--gold); }
   #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
   #hangarFoot { text-align: center; color: var(--dim); font-size: var(--fs-xs); }
@@ -436,6 +439,10 @@
     </div>
   </div>
   <div id="hangarBottom">
+    <div id="coopRow">
+      <button class="btn small" id="coopBtn">👤 ОДИН ГРАВЕЦЬ</button>
+      <span id="coopHint">другий грає на стрілках + Enter, на одній клавіатурі</span>
+    </div>
     <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
     <div id="hangarFoot">
       <span id="verTag" style="color:var(--neon)"></span> · прогрес зберігається сам ·

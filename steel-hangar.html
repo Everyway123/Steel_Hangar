@@ -117,6 +117,9 @@
     text-shadow: 0 0 8px rgba(255,210,63,.5);
   }
   #hangarBottom { display: flex; flex-direction: column; gap: 5px; }
+  #coopRow { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #coopHint { color: var(--dim); font-size: var(--fs-xs); }
+  #coopBtn.on { border-color: var(--gold); color: var(--gold); }
   #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
   #hangarFoot { text-align: center; color: var(--dim); font-size: var(--fs-xs); }
@@ -385,6 +388,10 @@
     </div>
   </div>
   <div id="hangarBottom">
+    <div id="coopRow">
+      <button class="btn small" id="coopBtn">👤 ОДИН ГРАВЕЦЬ</button>
+      <span id="coopHint">другий грає на стрілках + Enter, на одній клавіатурі</span>
+    </div>
     <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
     <div id="hangarFoot">
       <span id="verTag" style="color:var(--neon)"></span> · прогрес зберігається сам ·
@@ -593,6 +600,7 @@ function loadSave() {
     if (!save.front) save.front = { level: 1, liberated: ['plazdarm'] };
     if (!Array.isArray(save.codex)) save.codex = [];
     if (typeof save.freeXp !== 'number') save.freeXp = 0;
+    if (typeof save.coop !== 'boolean') save.coop = false;
   } catch (e) { save = defaultSave(); }
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
@@ -957,7 +965,7 @@ let touchMode = IS_TOUCH; // на тачі точного керування н�
 let spawnQueue, spawnPoints, spawnTimer, maxAlive;
 let battle; // статистика поточного бою
 let state = 'hangar';
-let keys = {}, lastTime = 0, shakeTime = 0, freezeTimer = 0;
+let keys = {}, keys2 = {}, lastTime = 0, shakeTime = 0, freezeTimer = 0;
 let pendingPerks = 0;
 
 // ---------- Аудіо: соковиті звуки + процедурна музика ----------
@@ -1426,7 +1434,20 @@ function startBattle(sector) {
     speed: st.speed, fireCd: st.fireCd, bulletSpeed: st.bulletSpeed,
     cooldown: 0, invuln: 1500, turretAngle: -Math.PI / 2,
     accelMs: 0, ramp: st.ramp,
+    lives: LIVES, color: '#39ff88', tag: 'Гравець 1',
   };
+  // ДРУГИЙ ГРАВЕЦЬ. Той самий танк, що й у першого — кооператив має бути
+  // чесним, а не «один тягне, другий дивиться». Колір бірюзовий: зелений
+  // зайнятий першим, теплі — ворогами, фіолетовий — ШІ-союзником.
+  p2 = save.coop ? {
+    x: 0, y: 0, dir: 'up', size: st.size,
+    maxHp: st.hp, hp: st.hp, dmg: st.dmg, armor: st.armor,
+    speed: st.speed, fireCd: st.fireCd, bulletSpeed: st.bulletSpeed,
+    cooldown: 0, invuln: 1500, turretAngle: -Math.PI / 2,
+    accelMs: 0, ramp: st.ramp,
+    lives: LIVES, color: '#5ef0ff', tag: 'Гравець 2', isP2: true,
+  } : null;
+  keys = {}; keys2 = {};
 
   grid = []; gridHp = [];
   spawnPoints = []; enemies = []; bullets = []; particles = []; drops = [];
@@ -1553,6 +1574,13 @@ function startBattle(sector) {
   clearSpawns();
   freePlayerSpot();
   player.buffs = []; player.fragile = 1;
+  if (p2) {
+    // ставимо напарника збоку від тебе і звільняємо йому клітину
+    p2.x = player.x + TILE; p2.y = player.y;
+    if (p2.x > W - TILE) p2.x = player.x - TILE;
+    freeTankSpot(p2);
+    p2.buffs = []; p2.fragile = 1;
+  }
   battle.helpers = [];
   battle.homeHp = baseHp; battle.homeMax = baseHp;
   battle.homeR = pr; battle.homeC = pc;
@@ -1606,7 +1634,9 @@ function startBattle(sector) {
   // союзник у строю з першої секунди: він відтягує частину вогню, і саме
   // це дозволяє поставити на поле вдвічі більше ворогів, не вбиваючи гравця
   battle.helpers = [];
-  spawnHelper();
+  // ШІ-союзник потрібен лише в грі на одного: удвох напарник — жива людина,
+  // і третій дружній танк робив би поле нечитабельним
+  if (!p2) spawnHelper();
 
   // в обороні бій починається з порожнього поля: усе приносять хвилі
   spawnQueue = battle.mode === 'defense' ? [] : buildRoster(st.tier, elite);
@@ -1706,7 +1736,9 @@ function canMoveTo(tank, nx, ny) {
     if (now === 0 || blockedCorners(nx, ny, tank.size) > now) return false;
   }
   const probe = { x: nx, y: ny, size: tank.size };
-  if (tank !== player && tanksOverlap(probe, player)) return false;
+  // обидва гравці — тверді тіла одне для одного і для ворогів
+  if (tank !== player && player.hp > 0 && tanksOverlap(probe, player)) return false;
+  if (p2 && tank !== p2 && p2.hp > 0 && tanksOverlap(probe, p2)) return false;
   for (const e of enemies) {
     if (e !== tank && !e.spawning && tanksOverlap(probe, e)) return false;
   }
@@ -1813,21 +1845,24 @@ function fireBullet(tank, ang, speed, dmg, fromPlayer, overWalls) {
 
 function shoot(tank, isPlayer) {
   if (isPlayer) {
-    const twin = player.doubleShot || player.twin;
+    // ВАЖЛИВО: усе через tank, а не через глобального player — інакше другий
+    // гравець стріляв би характеристиками першого
+    const twin = tank.doubleShot || tank.twin;
     const angles = twin
-      ? [player.turretAngle - 0.07, player.turretAngle + 0.07]
-      : [player.turretAngle];
-    const berserkMult = player.berserk ? 1 + 1.5 * (1 - player.hp / player.maxHp) : 1;
+      ? [tank.turretAngle - 0.07, tank.turretAngle + 0.07]
+      : [tank.turretAngle];
+    const berserkMult = tank.berserk ? 1 + 1.5 * (1 - tank.hp / tank.maxHp) : 1;
     for (const a of angles) {
-      const homes = player.homingRounds || player.homes;
-      fireBullet(tank, a, homes ? player.bulletSpeed * 0.8 : player.bulletSpeed, player.dmg * berserkMult, true);
+      const homes = tank.homingRounds || tank.homes;
+      fireBullet(tank, a, homes ? tank.bulletSpeed * 0.8 : tank.bulletSpeed, tank.dmg * berserkMult, true);
       if (homes) bullets[bullets.length - 1].homing = 'enemy';
     }
   } else {
     // вороги стріляють у гравця з невеликим розкидом
-    const distP = Math.hypot(player.x - tank.x, player.y - tank.y);
+    const tp = nearestPlayer(tank.x, tank.y);
+    const distP = Math.hypot(tp.x - tank.x, tp.y - tank.y);
     const spread = 0.12 + Math.min(0.4, distP / 900); // впритул точні, здалеку мажуть
-    const ang = Math.atan2(player.y - tank.y, player.x - tank.x) + (Math.random() - 0.5) * spread * 2;
+    const ang = Math.atan2(tp.y - tank.y, tp.x - tank.x) + (Math.random() - 0.5) * spread * 2;
     tank.turretAngle = ang;
     const angs = tank.twin ? [ang - 0.07, ang + 0.07] : [ang];
     for (const a of angs) {
@@ -1837,7 +1872,8 @@ function shoot(tank, isPlayer) {
   }
 }
 function bossSpreadShot(boss) {
-  const ang = Math.atan2(player.y - boss.y, player.x - boss.x);
+  const bp = nearestPlayer(boss.x, boss.y);
+  const ang = Math.atan2(bp.y - boss.y, bp.x - boss.x);
   boss.turretAngle = ang;
   for (const a of [ang - 0.35, ang, ang + 0.35]) {
     fireBullet(boss, a, 3.6, boss.dmg, false);
@@ -1906,8 +1942,10 @@ function updateEnemy(e, dt) {
       const dd = Math.hypot(d.x - e.x, d.y - e.y);
       if (dd < ld) { ld = dd; loot = d; }
     }
-    const tx = loot ? loot.x : goHome ? homeX : player.x;
-    const ty = loot ? loot.y : goHome ? homeY : player.y;
+    // ворог іде на НАЙБЛИЖЧОГО з гравців, а не завжди на першого
+    const tp = nearestPlayer(e.x, e.y);
+    const tx = loot ? loot.x : goHome ? homeX : tp.x;
+    const ty = loot ? loot.y : goHome ? homeY : tp.y;
     const ddx = tx - e.x, ddy = ty - e.y;
     const chase = Math.hypot(ddx, ddy) < 300 ? 0.88 : 0.72;
     if (Math.random() < chase) {
@@ -1946,14 +1984,15 @@ function updateEnemy(e, dt) {
   e.cooldown -= dt;
   if (e.cooldown <= 0) {
     const range = battle.mod === 'fog' ? 280 : 460; // у тумані бачать гірше
-    const dist = Math.hypot(player.x - e.x, player.y - e.y);
-    const angP = Math.atan2(player.y - e.y, player.x - e.x);
+    const pv = nearestPlayer(e.x, e.y);
+    const dist = Math.hypot(pv.x - e.x, pv.y - e.y);
+    const angP = Math.atan2(pv.y - e.y, pv.x - e.x);
     const facing = DIR_ANGLE[e.dir];
     const diff = Math.abs(((angP - facing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
     // у кущах і за димогенератором дальність виявлення різко падає
-    const hidden = tileAt(player.x, player.y) === T_BUSH ? 0.45 : 1;
-    const visMult = hidden * (player.lowVis ? 0.5 : 1);
-    const los = dist < range * visMult && hasLOS(e.x, e.y, player.x, player.y);
+    const hidden = tileAt(pv.x, pv.y) === T_BUSH ? 0.45 : 1;
+    const visMult = hidden * (pv.lowVis ? 0.5 : 1);
+    const los = dist < range * visMult && hasLOS(e.x, e.y, pv.x, pv.y);
 
     // впритул конус ширший — в упор не промахуються
     const cone = dist < 120 ? 0.8 : 0.5;
@@ -2174,35 +2213,8 @@ function updateBullets(dt) {
       }
     } else if (hitHelper(b)) {
       // влучання в помічника оброблено всередині
-    } else if (player.invuln <= 0 &&
-               Math.abs(b.x - player.x) < player.size / 2 &&
-               Math.abs(b.y - player.y) < player.size / 2) {
-      b.dead = true;
-      // РИКОШЕТ: шанс залежить від броні — фішка важких танків
-      const ricoChance = Math.min(0.45, Math.max(0, player.armor) * 0.06);
-      if (Math.random() < ricoChance) {
-        battle.ricochets++;
-        sfx.rico();
-        floatText(player.x, player.y - 24, 'РИКОШЕТ!', '#ffd23f');
-        spawnParticles(b.x, b.y, '#ffd23f', 4);
-        // реактивна броня: снаряд летить назад у кривдника
-        if (player.reflect) {
-          bullets.push({
-            x: b.x, y: b.y, dx: -b.dx, dy: -b.dy,
-            speed: 6, dmg: Math.max(1, player.dmg * 0.6), fromPlayer: true,
-          });
-        }
-      } else {
-        const dmg = Math.max(1, Math.round((b.dmg - Math.max(0, player.armor) * 0.7) * (player.fragile || 1)));
-        player.hp -= dmg;
-        battle.dmgTaken += dmg;
-        player.invuln = player.smoke ? 2000 : 600; // димова завіса подовжує невразливість
-        shakeTime = 180;
-        sfx.hit();
-        floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
-        spawnParticles(b.x, b.y, '#39ff88', 6);
-        if (player.hp <= 0) { playerDied(); return; }
-      }
+    } else if (hitPlayerTank(b)) {
+      // влучання в гравця оброблено всередині
     }
 
     // кулі гравця збивають ворожі
@@ -2236,13 +2248,15 @@ function explodeBarrel(r, c) {
       if (e.hp <= 0) killEnemy(e);
     }
   }
-  if (Math.hypot(player.x - bx, player.y - by) < R && player.invuln <= 0) {
-    const dmg = Math.max(1, Math.round((5 - Math.max(0, player.armor)) * (player.fragile || 1)));
-    player.hp -= dmg;
+  // бочка б'є обох гравців, а не лише першого
+  for (const p of livePlayers()) {
+    if (Math.hypot(p.x - bx, p.y - by) >= R || p.invuln > 0) continue;
+    const dmg = Math.max(1, Math.round((5 - Math.max(0, p.armor)) * (p.fragile || 1)));
+    p.hp -= dmg;
     battle.dmgTaken += dmg;
-    player.invuln = 600;
-    floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
-    if (player.hp <= 0) { playerDied(); return; }
+    p.invuln = 600;
+    floatText(p.x, p.y - 24, '-' + dmg, '#ff4d5e');
+    if (p.hp <= 0) playerDied(p);
   }
   // руйнує сусідню цеглу і підриває сусідні бочки ланцюгом
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
@@ -2269,8 +2283,9 @@ function destroyTurret(r, c) {
 
 function updateTurrets(dt) {
   for (const t of battle.turrets) {
-    const dist = Math.hypot(player.x - t.x, player.y - t.y);
-    t.ang = Math.atan2(player.y - t.y, player.x - t.x);
+    const tp = nearestPlayer(t.x, t.y);
+    const dist = Math.hypot(tp.x - t.x, tp.y - t.y);
+    t.ang = Math.atan2(tp.y - t.y, tp.x - t.x);
     t.cd -= dt;
     // Лінію огляду міряємо ВІД ДУЛА, а не від центру. hasLOS робить перший
     // замір за 16 px від початку — тобто всередині власної клітини ДОТа, а
@@ -2279,7 +2294,7 @@ function updateTurrets(dt) {
     const mx = t.x + Math.cos(t.ang) * 24, my = t.y + Math.sin(t.ang) * 24;
     // ДОТ має власний темп і не ділить спільний ліміт пострілів армії:
     // при десятку живих танків черга до нього просто не доходила.
-    if (t.cd <= 0 && dist < 420 && hasLOS(mx, my, player.x, player.y)) {
+    if (t.cd <= 0 && dist < 420 && hasLOS(mx, my, tp.x, tp.y)) {
       const ang = t.ang + (Math.random() - 0.5) * 0.2;
       bullets.push({ x: t.x + Math.cos(ang) * 24, y: t.y + Math.sin(ang) * 24, dx: Math.cos(ang), dy: Math.sin(ang), speed: 3.8, dmg: 3, fromPlayer: false });
       sfx.shoot();
@@ -2293,29 +2308,80 @@ function updateTurrets(dt) {
 // раунд замість подовжити. Життя знімають саме цю стелю: смерть коштує дорого,
 // але не обриває бій на 30-й секунді. Як в оригінальному Battle City.
 const LIVES = 3;
-function playerDied() {
-  battle.lives = (battle.lives === undefined ? LIVES : battle.lives) - 1;
+// Влучання в гравця. Виділено з updateBullets, бо тепер гравців двоє:
+// параметр навмисно названий player, щоб наявне тіло працювало для кожного.
+function hitPlayerTank(b) {
+  for (const player of livePlayers()) {
+    if (player.invuln > 0) continue;
+    if (Math.abs(b.x - player.x) >= player.size / 2) continue;
+    if (Math.abs(b.y - player.y) >= player.size / 2) continue;
+      b.dead = true;
+      // РИКОШЕТ: шанс залежить від броні — фішка важких танків
+      const ricoChance = Math.min(0.45, Math.max(0, player.armor) * 0.06);
+      if (Math.random() < ricoChance) {
+        battle.ricochets++;
+        sfx.rico();
+        floatText(player.x, player.y - 24, 'РИКОШЕТ!', '#ffd23f');
+        spawnParticles(b.x, b.y, '#ffd23f', 4);
+        // реактивна броня: снаряд летить назад у кривдника
+        if (player.reflect) {
+          bullets.push({
+            x: b.x, y: b.y, dx: -b.dx, dy: -b.dy,
+            speed: 6, dmg: Math.max(1, player.dmg * 0.6), fromPlayer: true,
+          });
+        }
+      } else {
+        const dmg = Math.max(1, Math.round((b.dmg - Math.max(0, player.armor) * 0.7) * (player.fragile || 1)));
+        player.hp -= dmg;
+        battle.dmgTaken += dmg;
+        player.invuln = player.smoke ? 2000 : 600; // димова завіса подовжує невразливість
+        shakeTime = 180;
+        sfx.hit();
+        floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
+        spawnParticles(b.x, b.y, '#39ff88', 6);
+        if (player.hp <= 0) { playerDied(player); return true; }
+      }
+      return true;
+  }
+  return false;
+}
+
+function playerDied(who) {
+  // Життя тепер у КОЖНОГО свої: у кооперативі несправедливо, коли смерть
+  // одного з'їдає спільний запас. Бій закінчується, лише коли вибиті обидва.
+  const t = who || player;
+  t.lives = (t.lives === undefined ? LIVES : t.lives) - 1;
   battle.deaths = (battle.deaths || 0) + 1;
-  spawnParticles(player.x, player.y, '#39ff88', 40);
+  spawnParticles(t.x, t.y, t.color || '#39ff88', 40);
   sfx.boom();
   shakeTime = 500;
+  t.hp = 0;
 
-  if (battle.lives <= 0) { endBattle(false); return; }
+  const anyLeft = [player, p2].some(q => q && q.lives > 0);
+  if (!anyLeft) { endBattle(false); return; }
 
-  // відроджуємось на власній базі, з коротким щитом і без набутих трофеїв:
-  // смерть має боліти, інакше життя перетворюють бій на нескінченний
+  if (t.lives <= 0) {
+    flashMsg(`${t.tag || ''} вибув — напарник ще тримається!`);
+    return;                       // чекає кінця бою, поки б'ється другий
+  }
+  respawnPlayer(t);
+  flashMsg(`💥 ${t.tag || 'Танк'} втрачено! Життів: ${t.lives}`);
+}
+
+// Відродження на власній базі: повний HP, короткий щит і БЕЗ набутих трофеїв —
+// смерть має боліти, інакше життя перетворюють бій на нескінченний.
+function respawnPlayer(t) {
   const r = Math.min(ROWS - 1, (battle.homeR !== undefined ? battle.homeR : ROWS - 1) - 1);
   const c = battle.homeC !== undefined ? battle.homeC : Math.floor(COLS / 2);
-  player.x = c * TILE + TILE / 2;
-  player.y = r * TILE + TILE / 2;
-  freeTankSpot(player);
-  player.hp = player.maxHp;
-  player.invuln = 2500;
-  player.dir = 'up';
-  player.turretAngle = -Math.PI / 2;
-  player.glide = 0; player.accelMs = 0;
-  for (const b of player.buffs.slice()) removeBuff(player, b.id);
-  flashMsg(`💥 Танк втрачено! Лишилось життів: ${battle.lives}`);
+  t.x = c * TILE + TILE / 2;
+  t.y = r * TILE + TILE / 2;
+  freeTankSpot(t);
+  t.hp = t.maxHp;
+  t.invuln = 2500;
+  t.dir = 'up';
+  t.turretAngle = -Math.PI / 2;
+  t.glide = 0; t.accelMs = 0;
+  if (t.buffs) for (const b of t.buffs.slice()) removeBuff(t, b.id);
 }
 
 // звільняє клітину під танком, щоб відродження не сталось у стіні
@@ -2619,13 +2685,15 @@ function modExplosion(x, y, R, dmgP, dmgE) {
       if (e.hp <= 0) killEnemy(e);
     }
   }
-  if (Math.hypot(player.x - x, player.y - y) < R && player.invuln <= 0) {
-    const dmg = Math.max(1, Math.round((dmgP - Math.max(0, player.armor)) * (player.fragile || 1)));
-    player.hp -= dmg;
+  // вибух модифікатора теж накриває обох
+  for (const p of livePlayers()) {
+    if (Math.hypot(p.x - x, p.y - y) >= R || p.invuln > 0) continue;
+    const dmg = Math.max(1, Math.round((dmgP - Math.max(0, p.armor)) * (p.fragile || 1)));
+    p.hp -= dmg;
     battle.dmgTaken += dmg;
-    player.invuln = 600;
-    floatText(player.x, player.y - 24, '-' + dmg, '#ff4d5e');
-    if (player.hp <= 0) playerDied();
+    p.invuln = 600;
+    floatText(p.x, p.y - 24, '-' + dmg, '#ff4d5e');
+    if (p.hp <= 0) playerDied(p);
   }
 }
 
@@ -2956,11 +3024,13 @@ function helperGoal(h) {
   for (const d of drops) {
     if (d.dead) continue;
     const dd = Math.hypot(d.x - h.x, d.y - h.y);
-    if (dd < bdd && Math.hypot(d.x - player.x, d.y - player.y) < 380) { bdd = dd; bestD = d; }
+    if (dd < bdd && Math.hypot(d.x - player.x, d.y - player.y) < 260) { bdd = dd; bestD = d; }
   }
   if (bestD) return { x: bestD.x, y: bestD.y, kind: 'loot' };
 
-  if (dp > 300) return { x: player.x, y: player.y, kind: 'player' };
+  // 170 px — приблизно чотири клітини: саме на такій дистанції союзник
+  // читається як крило, а не як окремий танк десь на карті
+  if (dp > 170) return { x: player.x, y: player.y, kind: 'player' };
 
   // в обороні база важливіша за фраг: ловимо того, хто до неї підбирається
   if (battle.mode === 'defense' && battle.homeR !== undefined) {
@@ -2978,11 +3048,17 @@ function helperGoal(h) {
   // полювання (420) перевищував повідець (300) і союзника гойдало між ними:
   // заміряно 43% часу далі ніж 380 px від тебе. Тепер він б'ється у твоєму
   // бою, а не тікає за найближчою мішенню.
-  let tgt = null, bd = 360;
+  // Ворог має бути близько і до ТЕБЕ, і до самого союзника. Обмеження лише
+  // за твоєю відстанню було недостатнім: ціль за 360 px від тебе могла лежати
+  // в протилежний від союзника бік, і він їхав туди через пів карти —
+  // заміряно 0–42% бою далеко від гравця, залежно від розкладу карти.
+  let tgt = null, bd = 260;
   for (const e of enemies) {
     if (e.dead || e.spawning > 0) continue;
-    const d = Math.hypot(e.x - player.x, e.y - player.y);
-    if (d < bd) { bd = d; tgt = e; }
+    const dp = Math.hypot(e.x - player.x, e.y - player.y);
+    const dh = Math.hypot(e.x - h.x, e.y - h.y);
+    if (dp > 260 || dh > 260) continue;
+    if (dh < bd) { bd = dh; tgt = e; }
   }
   if (tgt) return { x: tgt.x, y: tgt.y, kind: 'enemy', tgt };
 
@@ -3119,19 +3195,20 @@ function finishHelper(h, dt, tgt, bd) {
 // В оригінальному Battle City ★ підсилювала танк, і саме цього тут бракувало.
 // Тепер зірки складаються протягом бою: швидший снаряд → урон → другий ствол.
 const STAR_STEPS = [
-  { txt: '★ швидший снаряд', on: () => { player.bulletSpeed *= 1.25; } },
-  { txt: '★★ +30% урону',    on: () => { player.dmg *= 1.3; } },
-  { txt: '★★★ ДРУГИЙ СТВОЛ', on: () => { player.twin = true; } },
+  { txt: '★ швидший снаряд', on: t => { t.bulletSpeed *= 1.25; } },
+  { txt: '★★ +30% урону',    on: t => { t.dmg *= 1.3; } },
+  { txt: '★★★ ДРУГИЙ СТВОЛ', on: t => { t.twin = true; } },
 ];
-function takeStar(x, y, prefix) {
+function takeStar(x, y, prefix, who) {
+  const t = who || player;                 // підсилюється той, хто підібрав
   battle.stars = (battle.stars || 0) + 1;
   const step = STAR_STEPS[battle.stars - 1];
   if (step) {
-    step.on();
+    step.on(t);
     floatText(x, y, prefix + step.txt, '#ffd23f');
   } else {
     // далі зірок нема чим дивувати — кожна наступна просто додає урон
-    player.dmg *= 1.15;
+    t.dmg *= 1.15;
     floatText(x, y, `${prefix}★×${battle.stars} +15% урону`, '#ffd23f');
   }
   battle.credits += 60;
@@ -3201,13 +3278,16 @@ function updateDrops(dt) {
     }
     if (d.dead) continue;
 
-    if (Math.abs(d.x - player.x) < 28 && Math.abs(d.y - player.y) < 28) {
+    // трофей бере той, хто до нього доїхав — і бонус дістається саме йому
+    const taker = livePlayers().find(p =>
+      Math.abs(d.x - p.x) < 28 && Math.abs(d.y - p.y) < 28);
+    if (taker) {
       d.dead = true;
       sfx.pickup();
-      if (d.kind === 'med') { player.hp = Math.min(player.maxHp, player.hp + Math.ceil(player.maxHp * 0.3)); floatText(d.x, d.y, '+HP', '#ff8c69'); }
-      else if (d.kind === 'star') { takeStar(d.x, d.y, ''); }
+      if (d.kind === 'med') { taker.hp = Math.min(taker.maxHp, taker.hp + Math.ceil(taker.maxHp * 0.3)); floatText(d.x, d.y, '+HP', '#ff8c69'); }
+      else if (d.kind === 'star') { takeStar(d.x, d.y, '', taker); }
       else if (d.kind === 'freeze') { freezeTimer = 4000; floatText(d.x, d.y, 'ЗАМОРОЗКА!', '#6fd3ff'); }
-      else if (CRATES[d.kind]) { sfx.perk(); applyCrate(player, d.kind); }
+      else if (CRATES[d.kind]) { sfx.perk(); applyCrate(taker, d.kind); }
       else if (d.kind === 'crate') {
         battle.crateOut = false;
         pendingPerks++;
@@ -3246,7 +3326,37 @@ function updateParticles(dt) {
 }
 
 // ---------- Гравець ----------
+// ДВОЄ НА ОДНІЙ КЛАВІАТУРІ. `player` навмисно лишається Першим гравцем: на
+// нього зав'язано півтори сотні місць у коді, і переписувати їх усі в масив —
+// це ризик без користі. Другий гравець живе поруч як окремий танк, а всюди,
+// де ворог має когось знайти, тепер питаємо НАЙБЛИЖЧОГО з живих.
+let p2 = null;
+function livePlayers() {
+  const out = [];
+  if (player && player.hp > 0) out.push(player);
+  if (p2 && p2.hp > 0) out.push(p2);
+  return out;
+}
+// Ворогу, турелі, вибуху — будь-кому, хто шукає ціль. Якщо живих нема,
+// віддаємо Першого: код навколо очікує об'єкт, а не null.
+function nearestPlayer(x, y) {
+  const live = livePlayers();
+  if (!live.length) return player;
+  let best = live[0], bd = Infinity;
+  for (const p of live) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+
 function updatePlayer(dt) {
+  updateOnePlayer(player, keys, dt);
+  if (p2) updateOnePlayer(p2, keys2, dt);
+}
+
+function updateOnePlayer(player, keys, dt) {
+  if (player.hp <= 0) return;   // чекає на відродження
   if (player.invuln > 0) player.invuln -= dt;
   updateBuffs(player, dt);
   if (player.flash > 0) player.flash -= dt;
@@ -3279,8 +3389,8 @@ function updatePlayer(dt) {
   // куди дивиться корпус — туди й стріляємо; м'яке доведення ±20° прощає дрібні промахи
   // (на тачі — автоприціл, бо там нема точного керування)
   player.turretAngle = keys.fire && touchMode
-    ? autoAngle()
-    : coneAssist(DIR_ANGLE[player.dir]);
+    ? autoAngle(player)
+    : coneAssist(player, DIR_ANGLE[player.dir]);
 
   if (keys.fire && player.cooldown <= 0) {
     shoot(player, true);
@@ -3318,7 +3428,7 @@ function updatePlayer(dt) {
 
 // доведення в конусі: якщо в межах ±20° від обраного напрямку є видимий ворог —
 // ствол чіпляється за нього; якщо ні — стріляємо рівно куди натиснуто
-function coneAssist(base) {
+function coneAssist(player, base) {
   let best = base, bestDiff = 0.35;
   const maxDist = battle.mod === 'fog' ? 300 : 500;
   const consider = (x, y, size) => {
@@ -3340,12 +3450,12 @@ function coneAssist(base) {
   return best;
 }
 
-function autoAngle() {
-  const t = nearestTarget();
+function autoAngle(player) {
+  const t = nearestTarget(player);
   return t ? Math.atan2(t.y - player.y, t.x - player.x) : DIR_ANGLE[player.dir];
 }
 
-function nearestTarget() {
+function nearestTarget(player) {
   let best = null, bestD = Infinity, bestLOS = null, bestLOSD = Infinity;
   const consider = (x, y) => {
     const d = Math.hypot(x - player.x, y - player.y);
@@ -3939,7 +4049,29 @@ function draw() {
   ctx.arc(player.x, player.y, player.size * 0.62, 0, 7);
   ctx.stroke();
   ctx.restore();
-  drawTank(player, skinOf(battle.tank.id).hull, true);
+  if (player.hp > 0) drawTank(player, skinOf(battle.tank.id).hull, true);
+  // Другий гравець — бірюзовий, із підписом і кільцем: у купі танків треба
+  // з першого погляду розуміти, де ти, а де напарник.
+  if (p2 && p2.hp > 0) {
+    const pulse = 0.55 + 0.45 * Math.sin(battle.gameMs / 240);
+    ctx.save();
+    ctx.strokeStyle = p2.color;
+    ctx.globalAlpha = 0.35 + 0.3 * pulse;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(p2.x, p2.y + p2.size / 2 - 2, p2.size * 0.55, p2.size * 0.26, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.shadowColor = p2.color;
+    ctx.shadowBlur = 12;
+    drawTank(p2, p2.color, true);
+    ctx.restore();
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = p2.color;
+    ctx.fillText('② свій', p2.x, p2.y - p2.size / 2 - 16);
+  }
   for (const e of enemies) if (!e.dead) drawTank(e, e.color, false);
 
   for (const b of bullets) {
@@ -4118,9 +4250,19 @@ function drawHud() {
   ctx.fillStyle = homeFrac < 0.4 ? '#ff4d5e' : '#39ff88';
   const left = `★ ${Math.round(homeFrac * 100)}%   ☭ ${battle.hqLeft}`;
   const modIco = battle.mod ? '  ' + MOD_INFO[battle.mod].ico : '';
-  // життя — найважливіше число в бою, тож стоїть першим і червоніє на останньому
-  const lives = battle.lives === undefined ? LIVES : battle.lives;
-  ctx.fillText(`${'🛡'.repeat(Math.max(0, lives))}  ⚔ ${battle.frags}  ${left}${modIco}`, 10, midY);
+  // життя — найважливіше число в бою, тож стоїть першим
+  const l1 = Math.max(0, player.lives === undefined ? LIVES : player.lives);
+  ctx.fillText(`${'🛡'.repeat(l1)}  ⚔ ${battle.frags}  ${left}${modIco}`, 10, midY);
+  // у кооперативі життя другого — окремим рядком його ж кольором
+  if (p2) {
+    const l2 = Math.max(0, p2.lives || 0);
+    ctx.save();
+    ctx.fillStyle = p2.color;
+    ctx.textAlign = 'right';
+    ctx.fillText(`② ${'🛡'.repeat(l2) || '✖'}`, VIEW_W - 10, midY);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
 
   // взяті доктрини — праворуч від лічильників
   if (battle.perks.length) {
@@ -4410,6 +4552,7 @@ function fmt(n) { return n.toLocaleString('uk-UA'); }
 function renderHangar() {
   document.getElementById('uiCredits').textContent = fmt(save.credits);
   document.getElementById('uiFreeXp').textContent = fmt(save.freeXp || 0);
+  renderCoopBtn();
   document.getElementById('uiBattles').textContent = save.battles;
   document.getElementById('uiWins').textContent = save.wins;
 
@@ -4695,6 +4838,9 @@ function flashMsg(text) {
 
 // ---------- Ввід ----------
 // Класика: куди дивиться танк — туди й стріляє
+// У грі на одного стрілки й WASD роблять те саме — зручно будь-кому.
+// Удвох вони РОЗХОДЯТЬСЯ: перший на WASD + Пробіл, другий на стрілках +
+// Enter. Так двоє поміщаються за однією клавіатурою, не заважаючи ліктями.
 const KEYMAP = {
   ArrowUp: 'up', KeyW: 'up',
   ArrowDown: 'down', KeyS: 'down',
@@ -4702,6 +4848,21 @@ const KEYMAP = {
   ArrowRight: 'right', KeyD: 'right',
   Space: 'fire',
 };
+const KEYMAP_P1 = {
+  KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', Space: 'fire',
+};
+const KEYMAP_P2 = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  Enter: 'fire', NumpadEnter: 'fire', Numpad0: 'fire',
+};
+// який набір клавіш дивиться в який набір станів
+function keyTargets(code) {
+  if (!p2) return KEYMAP[code] ? [[keys, KEYMAP[code]]] : [];
+  const out = [];
+  if (KEYMAP_P1[code]) out.push([keys, KEYMAP_P1[code]]);
+  if (KEYMAP_P2[code]) out.push([keys2, KEYMAP_P2[code]]);
+  return out;
+}
 
 function pauseGame() {
   state = 'pause';
@@ -4721,7 +4882,8 @@ function quitBattle() {
 }
 
 document.addEventListener('keydown', e => {
-  if (KEYMAP[e.code] && state === 'play') { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
+  const kt = keyTargets(e.code);
+  if (kt.length && state === 'play') { for (const [k, a] of kt) k[a] = true; e.preventDefault(); }
   if (e.code === 'KeyE' && state === 'play') useMedkit();
   if (e.code === 'KeyM') toggleMusic();
   if (e.code === 'Enter' && state === 'results') toHangar();
@@ -4738,9 +4900,27 @@ document.addEventListener('keydown', e => {
     if (picks[idx]) pickPerk(picks[idx]);
   }
 });
-document.addEventListener('keyup', e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
+document.addEventListener('keyup', e => { for (const [k, a] of keyTargets(e.code)) k[a] = false; });
 
 document.getElementById('battleBtn').onclick = () => { startMusic(); showFront(); };
+
+// Перемикач кооперативу. Зберігається разом із прогресом, щоб не вмикати
+// його щоразу заново, і показує, яка саме розкладка кого слухає.
+function renderCoopBtn() {
+  const b = document.getElementById('coopBtn');
+  if (!b) return;
+  b.textContent = save.coop ? '👥 ДВОЄ НА ОДНІЙ КЛАВІАТУРІ' : '👤 ОДИН ГРАВЕЦЬ';
+  b.classList.toggle('on', !!save.coop);
+  document.getElementById('coopHint').textContent = save.coop
+    ? '① WASD + Пробіл   ②  стрілки + Enter'
+    : 'натисни, щоб грати удвох на одній клавіатурі';
+}
+document.getElementById('coopBtn').onclick = () => {
+  save.coop = !save.coop;
+  persist();
+  renderCoopBtn();
+  flashMsg(save.coop ? '👥 Кооператив: ① WASD+Пробіл, ② стрілки+Enter' : '👤 Гра на одного');
+};
 
 // вкладки правої панелі: модулі / кодекс / аналітика
 for (const tab of document.querySelectorAll('.tab')) {
@@ -4863,14 +5043,14 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v36 · три життя, довші раунди й музика з темою';
+const GAME_VERSION = 'v37 · удвох на одній клавіатурі';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
 requestAnimationFrame(loop);
 
 // хук для автотестів
-window.addEventListener('blur', () => { keys = {}; });
+window.addEventListener('blur', () => { keys = {}; keys2 = {}; });
 window._dbg = { get: () => ({ state, battle, player, enemies, bullets, drops, spawnQueue, save, keys, grid }), killEnemy, music: () => music, ctx: () => audioCtx };
 
 </script>
