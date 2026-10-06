@@ -195,6 +195,94 @@ BLOCKS.music = async browser => {
   await page.close();
 };
 
+// ОНЛАЙН. Тут потрібні ДВІ сторінки й справжній WebRTC між ними — підробити
+// це моками безглуздо: саме з'єднання і є те, що може зламатись.
+BLOCKS.online = async browser => {
+  const ctx = await browser.newContext({ viewport: { width: 1000, height: 950 } });
+  const host = await ctx.newPage(), cli = await ctx.newPage();
+  const errs = [];
+  host.on('pageerror', e => errs.push('host: ' + e.message));
+  cli.on('pageerror', e => errs.push('client: ' + e.message));
+  await host.goto(GAME); await cli.goto(GAME);
+  await host.waitForTimeout(400); await cli.waitForTimeout(400);
+
+  // 1. рукостискання без жодного сервера
+    const offer = await host.evaluate(() => netHost());
+      t('хост згенерував код', typeof offer === 'string' && offer.length > 200, `${offer.length} символів`);
+    const answer = await cli.evaluate(o => netJoin(o), offer);
+      t('клієнт відповів кодом', typeof answer === 'string' && answer.length > 200, `${answer.length} символів`);
+    await host.evaluate(a => netHostAccept(a), answer);
+
+    const opened = await host.evaluate(async () => {
+      for (let i = 0; i < 100; i++) {
+        if (net.ch && net.ch.readyState === 'open') return true;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return false;
+    });
+      t('канал відкрито між браузерами', opened);
+    if (!opened) { console.log('\n' + ok + ' ok, ' + (fail) + ' fail'); await b.close(); process.exit(1); }
+
+    // 2. хост починає бій — у нього з'являється другий танк
+    const started = await host.evaluate(() => {
+      startBattle({ id: null, name: 't', map: 'Полігон', mode: 'clear', mod: null });
+      return { p2: !!p2, role: net.role };
+    });
+      t('у хоста є танк напарника', started.p2 && started.role === 'host');
+
+    // 3. знімки доходять і клієнт бачить те саме поле
+    const got = await cli.evaluate(async () => {
+      for (let i = 0; i < 100; i++) {
+        if (net.snap && battle && enemies) return {
+          map: battle.mapName, enemies: enemies.length,
+          hasP1: !!player && player.hp > 0, hasP2: !!p2, state,
+        };
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return null;
+    });
+      t('клієнт отримує знімок поля', !!got, got ? `карта «${got.map}», ворогів ${got.enemies}` : 'знімка нема');
+      t('клієнт бачить обидва танки', got && got.hasP1 && got.hasP2);
+      t('клієнт перейшов у бій', got && got.state === 'play', got ? got.state : '');
+
+    // 4. НАЙГОЛОВНІШЕ: натискання на клієнті рухає його танк на хості
+    // пробуємо всі напрямки: зі старту танк може впиратись у стіну своєї ж бази,
+    // і тоді «не поїхав» означало б лише те, що ми натиснули не в той бік
+    // хост має бути активною вкладкою: у фоновій браузер душить rAF і симуляція
+    // майже не крутиться — це обмеження тесту, а не гри
+    await host.bringToFront();
+    let best = 0, bestDir = '';
+    for (const dir of ['left', 'right', 'up', 'down']) {
+      const from = await host.evaluate(() => ({ x: p2.x, y: p2.y }));
+      await cli.evaluate(d => { keys[d] = true; }, dir);
+      await host.waitForTimeout(700);
+      await cli.evaluate(d => { keys[d] = false; }, dir);
+      const to = await host.evaluate(() => ({ x: p2.x, y: p2.y }));
+      const dd = Math.hypot(to.x - from.x, to.y - from.y);
+      if (dd > best) { best = dd; bestDir = dir; }
+    }
+    const peer = await host.evaluate(() => JSON.stringify(net.peerKeys));
+      t('клавіші клієнта рухають його танк на хості', best > 20,
+      `найкращий зсув ${best.toFixed(0)}px (${bestDir}), хост бачив ${peer}`);
+
+    // 5. танк першого при цьому стоїть
+    const p1moved = await host.evaluate(() => ({ x: player.x, y: player.y }));
+    await host.waitForTimeout(300);
+    const p1after = await host.evaluate(() => ({ x: player.x, y: player.y }));
+      t('танк хоста не смикається від чужих клавіш',
+      Math.hypot(p1after.x - p1moved.x, p1after.y - p1moved.y) < 3);
+
+    // 6. розрив не ламає гру
+    await cli.evaluate(() => { net.ch.close(); });
+    await host.waitForTimeout(500);
+    const alive = await host.evaluate(() => ({ state, role: net.role }));
+      t('після розриву хост продовжує бій', alive.state === 'play' && !alive.role, `state ${alive.state}`);
+
+      t('без помилок на сторінках', errs.length === 0, errs[0] || '');
+
+  await ctx.close();
+};
+
 // ДВОЄ НА ОДНІЙ КЛАВІАТУРІ. Увесь код був написаний під одного гравця —
 // 181 посилання на `player` — тож тут перевіряється саме те, що другий існує
 // по-справжньому: має власне керування, життя, трофеї і ворожу увагу.

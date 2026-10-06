@@ -93,6 +93,11 @@ City: faster shell, then more damage, then a second barrel.
 </td></tr>
 <tr><td>
 
+### 👥 Two players, together
+Same keyboard — **① WASD + Space, ② arrows + Enter** — or over the
+internet: the browsers connect directly by WebRTC, no server and no
+account. One side creates a game, the other pastes the code back.
+
 ### 🤝 A wingman from the first second
 An allied medium rolls out with you — 75% of your health,
 80% of your damage — and it fetches crates and stars, applying

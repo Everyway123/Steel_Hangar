@@ -171,6 +171,17 @@
   #coopRow { display: flex; align-items: center; justify-content: center; gap: 10px; }
   #coopHint { color: var(--dim); font-size: var(--fs-xs); }
   #coopBtn.on { border-color: var(--gold); color: var(--gold); }
+  #netBox { background: var(--panel); border: 2px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; max-width: 560px; width: 92vw; text-align: left; }
+  #netBox h2 { color: var(--neon); margin-bottom: 8px; }
+  #netBox .sub { color: var(--dim); font-size: var(--fs-xs); margin: 10px 0 4px; line-height: 1.45; }
+  #netBox textarea { width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-family: inherit;
+    font-size: 11px; padding: 7px; resize: vertical; }
+  #netPick { display: flex; gap: 10px; margin: 12px 0; }
+  #netStatus { color: var(--gold); font-size: var(--fs-sm); margin: 10px 0 6px; min-height: 18px; }
+  #netBox .btn { margin-top: 6px; }
+
   #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
   #hangarFoot { text-align: center; color: var(--dim); font-size: var(--fs-xs); }
@@ -441,6 +452,7 @@
   <div id="hangarBottom">
     <div id="coopRow">
       <button class="btn small" id="coopBtn">👤 ОДИН ГРАВЕЦЬ</button>
+      <button class="btn small" id="netBtn">🌐 ОНЛАЙН</button>
       <span id="coopHint">другий грає на стрілках + Enter, на одній клавіатурі</span>
     </div>
     <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
@@ -468,6 +480,43 @@
   <div id="frontMap"><svg id="frontEdges"></svg></div>
   <div id="eliteBanner2" class="hidden">☠ наступний ВІЛЬНИЙ бій — елітний: бос і подвійна нагорода ☠</div>
   <div id="frontHint">Обирай золотий сектор і атакуй. Звільнені сектори дають постійний бонус срібла. Пройди до ☭ ЦИТАДЕЛІ!</div>
+</div>
+
+
+<!-- ==================== ОНЛАЙН ==================== -->
+<div id="netView" class="overlay hidden">
+  <div id="netBox">
+    <h2>🌐 ГРА ПО МЕРЕЖІ</h2>
+    <p class="sub" id="netIntro">Сервера немає — браузери з'єднуються напряму.
+      Один створює гру, другий приєднується. Кодами обмінюєтесь самі:
+      скопіював — кинув у будь-який месенджер.</p>
+
+    <div id="netPick">
+      <button class="btn" id="netHostBtn">① СТВОРИТИ ГРУ</button>
+      <button class="btn" id="netJoinBtn">② ПРИЄДНАТИСЬ</button>
+    </div>
+
+    <div id="netHostFlow" class="hidden">
+      <p class="sub">Крок 1. Надішли цей код напарнику:</p>
+      <textarea id="netOffer" readonly rows="3"></textarea>
+      <button class="btn small" id="netCopy1">📋 копіювати</button>
+      <p class="sub">Крок 2. Встав сюди код-відповідь від нього:</p>
+      <textarea id="netAnswerIn" rows="3" placeholder="код відповіді"></textarea>
+      <button class="btn" id="netAccept">ПІДКЛЮЧИТИ</button>
+    </div>
+
+    <div id="netJoinFlow" class="hidden">
+      <p class="sub">Крок 1. Встав код, який надіслав господар гри:</p>
+      <textarea id="netOfferIn" rows="3" placeholder="код гри"></textarea>
+      <button class="btn" id="netMakeAnswer">ВІДПОВІСТИ</button>
+      <p class="sub">Крок 2. Надішли цей код-відповідь назад:</p>
+      <textarea id="netAnswer" readonly rows="3"></textarea>
+      <button class="btn small" id="netCopy2">📋 копіювати</button>
+    </div>
+
+    <p id="netStatus"></p>
+    <button class="btn small" id="netClose">закрити</button>
+  </div>
 </div>
 
 <!-- ==================== БІЙ ==================== -->

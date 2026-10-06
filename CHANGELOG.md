@@ -4,6 +4,40 @@ Every entry here is a change you can feel in a battle. Balance numbers are
 measured with headless playtests, not estimated — where a number appears, it
 came from a run.
 
+## v38 — online co-op, and still no server
+
+Play together over the internet without the game growing a backend. The two
+browsers connect **directly over WebRTC**; the only thing a server would have
+done — introducing the peers — you do yourselves: one player creates a game and
+gets a code, the other pastes it and sends a reply code back. Two copy-pastes
+through any messenger and you are in.
+
+**The model is host-authoritative.** The host runs the entire simulation and
+sends a snapshot 20 times a second; the client sends nothing but its key states
+and draws what arrives. For co-op against bots that is the right trade: your own
+tank answers a channel-round-trip late, but two simulations can never drift
+apart, which is the failure mode that actually ruins a game.
+
+The client reuses the existing renderer untouched — the snapshot is unpacked
+straight into the same globals the draw code already reads, so not one line of
+drawing was duplicated.
+
+Five things the two-page test caught that I would not have found by reasoning:
+the client crashed on `battle.mines`, `particles` and `spawnQueue`, none of which
+it had ever initialised because it never runs `startBattle`; bullets rendered as
+exceptions because their trail needs a direction and I was only sending a point;
+and input died in a background tab, because I was sending keys from the render
+frame and browsers throttle `requestAnimationFrame` when a tab loses focus —
+input now runs on its own 30 Hz timer, which is where it belonged anyway.
+
+Honest limits. **Online does not work inside the Claude artifact**: the artifact
+sandbox blocks `RTCPeerConnection` outright, so the button says so instead of
+handing you codes that can never connect — play at the live site. Connection
+needs a public STUN server (Google's), the one external dependency in the whole
+project, and behind some carrier NATs a direct connection will simply fail.
+If the channel drops, the host keeps playing alone and the client returns to
+the hangar rather than freezing.
+
 ## v37 — two players, one keyboard
 
 Co-op, the way the original Battle City did it: both tanks on the same screen,

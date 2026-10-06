@@ -120,6 +120,17 @@
   #coopRow { display: flex; align-items: center; justify-content: center; gap: 10px; }
   #coopHint { color: var(--dim); font-size: var(--fs-xs); }
   #coopBtn.on { border-color: var(--gold); color: var(--gold); }
+  #netBox { background: var(--panel); border: 2px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; max-width: 560px; width: 92vw; text-align: left; }
+  #netBox h2 { color: var(--neon); margin-bottom: 8px; }
+  #netBox .sub { color: var(--dim); font-size: var(--fs-xs); margin: 10px 0 4px; line-height: 1.45; }
+  #netBox textarea { width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-family: inherit;
+    font-size: 11px; padding: 7px; resize: vertical; }
+  #netPick { display: flex; gap: 10px; margin: 12px 0; }
+  #netStatus { color: var(--gold); font-size: var(--fs-sm); margin: 10px 0 6px; min-height: 18px; }
+  #netBox .btn { margin-top: 6px; }
+
   #eliteBanner { text-align: center; color: var(--danger); font-size: 13px; margin-top: 8px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: .4; } }
   #hangarFoot { text-align: center; color: var(--dim); font-size: var(--fs-xs); }
@@ -390,6 +401,7 @@
   <div id="hangarBottom">
     <div id="coopRow">
       <button class="btn small" id="coopBtn">👤 ОДИН ГРАВЕЦЬ</button>
+      <button class="btn small" id="netBtn">🌐 ОНЛАЙН</button>
       <span id="coopHint">другий грає на стрілках + Enter, на одній клавіатурі</span>
     </div>
     <button class="btn gold" id="battleBtn">🗺 НА ФРОНТ!</button>
@@ -417,6 +429,43 @@
   <div id="frontMap"><svg id="frontEdges"></svg></div>
   <div id="eliteBanner2" class="hidden">☠ наступний ВІЛЬНИЙ бій — елітний: бос і подвійна нагорода ☠</div>
   <div id="frontHint">Обирай золотий сектор і атакуй. Звільнені сектори дають постійний бонус срібла. Пройди до ☭ ЦИТАДЕЛІ!</div>
+</div>
+
+
+<!-- ==================== ОНЛАЙН ==================== -->
+<div id="netView" class="overlay hidden">
+  <div id="netBox">
+    <h2>🌐 ГРА ПО МЕРЕЖІ</h2>
+    <p class="sub" id="netIntro">Сервера немає — браузери з'єднуються напряму.
+      Один створює гру, другий приєднується. Кодами обмінюєтесь самі:
+      скопіював — кинув у будь-який месенджер.</p>
+
+    <div id="netPick">
+      <button class="btn" id="netHostBtn">① СТВОРИТИ ГРУ</button>
+      <button class="btn" id="netJoinBtn">② ПРИЄДНАТИСЬ</button>
+    </div>
+
+    <div id="netHostFlow" class="hidden">
+      <p class="sub">Крок 1. Надішли цей код напарнику:</p>
+      <textarea id="netOffer" readonly rows="3"></textarea>
+      <button class="btn small" id="netCopy1">📋 копіювати</button>
+      <p class="sub">Крок 2. Встав сюди код-відповідь від нього:</p>
+      <textarea id="netAnswerIn" rows="3" placeholder="код відповіді"></textarea>
+      <button class="btn" id="netAccept">ПІДКЛЮЧИТИ</button>
+    </div>
+
+    <div id="netJoinFlow" class="hidden">
+      <p class="sub">Крок 1. Встав код, який надіслав господар гри:</p>
+      <textarea id="netOfferIn" rows="3" placeholder="код гри"></textarea>
+      <button class="btn" id="netMakeAnswer">ВІДПОВІСТИ</button>
+      <p class="sub">Крок 2. Надішли цей код-відповідь назад:</p>
+      <textarea id="netAnswer" readonly rows="3"></textarea>
+      <button class="btn small" id="netCopy2">📋 копіювати</button>
+    </div>
+
+    <p id="netStatus"></p>
+    <button class="btn small" id="netClose">закрити</button>
+  </div>
 </div>
 
 <!-- ==================== БІЙ ==================== -->
@@ -1439,7 +1488,7 @@ function startBattle(sector) {
   // ДРУГИЙ ГРАВЕЦЬ. Той самий танк, що й у першого — кооператив має бути
   // чесним, а не «один тягне, другий дивиться». Колір бірюзовий: зелений
   // зайнятий першим, теплі — ворогами, фіолетовий — ШІ-союзником.
-  p2 = save.coop ? {
+  p2 = (save.coop || net.role === 'host') ? {
     x: 0, y: 0, dir: 'up', size: st.size,
     maxHp: st.hp, hp: st.hp, dmg: st.dmg, armor: st.armor,
     speed: st.speed, fireCd: st.fireCd, bulletSpeed: st.bulletSpeed,
@@ -3352,7 +3401,9 @@ function nearestPlayer(x, y) {
 
 function updatePlayer(dt) {
   updateOnePlayer(player, keys, dt);
-  if (p2) updateOnePlayer(p2, keys2, dt);
+  // Онлайн: другим танком керує напарник з мережі, локальні стрілки його не
+  // чіпають. Удвох за одним столом - навпаки, це keys2.
+  if (p2) updateOnePlayer(p2, net.role === 'host' ? net.peerKeys : keys2, dt);
 }
 
 function updateOnePlayer(player, keys, dt) {
@@ -4466,6 +4517,16 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(50, now - lastTime);
   lastTime = now;
+
+  // КЛІЄНТ нічого не рахує: бій живе на хості. Тут лише розкласти присланий
+  // знімок у ті самі глобальні змінні й намалювати наявним рендером.
+  if (net.role === 'client') {
+    netSendKeys();
+    netApply(net.snap);
+    if (battle) draw();
+    return;
+  }
+
   if (state !== 'play') { if (state === 'perk' || state === 'results' || state === 'pause') draw(); return; }
 
   if (shakeTime > 0) shakeTime -= dt;
@@ -4542,6 +4603,7 @@ function loop(now) {
   updateDrops(dt);
   updateParticles(dt);
   draw();
+  netSendSnap();     // хост віддає напарнику стан поля
 }
 
 // ============================================================
@@ -4836,6 +4898,292 @@ function flashMsg(text) {
   msgTimer = setTimeout(() => { el.style.display = 'none'; }, 2600);
 }
 
+// ---------- Онлайн: кооператив через WebRTC, без сервера ----------
+// Гра — це два статичні файли, які працюють навіть з диска, і онлайн не має
+// цього ламати. Тому замість свого сервера тут пряме з'єднання між браузерами,
+// а обмін кодами підключення робить сам гравець: скопіював рядок, кинув другу.
+//
+// Модель ХОСТ-АВТОРИТЕТНА: бій рахує тільки хост, клієнт шле натискання і
+// малює присланий знімок наявним рендером. Для кооперативу проти ботів це
+// чесний компроміс: свій танк у клієнта відгукується із затримкою каналу,
+// зате розсинхрону двох симуляцій не існує в принципі.
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+const SNAP_MS = 50;          // 20 знімків на секунду — вистачає, канал не тисне
+const net = {
+  role: null,                // 'host' | 'client' | null
+  pc: null, ch: null,
+  snap: null,                // останній знімок у клієнта
+  lastSend: 0,
+  peerKeys: {},              // натискання напарника (у хоста)
+  status: '',
+  onStatus: null,
+};
+
+function netSay(msg) {
+  net.status = msg;
+  if (net.onStatus) net.onStatus(msg);
+}
+function netActive() { return net.role && net.ch && net.ch.readyState === 'open'; }
+
+// SDP довгий, тож пакуємо в base64 — щоб це був один рядок, який можна
+// переслати в будь-якому месенджері
+const packSdp = d => btoa(unescape(encodeURIComponent(d.sdp)));
+const unpackSdp = (s, type) => ({ type, sdp: decodeURIComponent(escape(atob(s))) });
+
+// ICE-кандидати треба зібрати ДО того, як показати код: інакше в рядку не буде
+// адрес і з'єднання не встановиться
+function waitIce(pc) {
+  return new Promise(res => {
+    if (pc.iceGatheringState === 'complete') return res();
+    const t = setTimeout(res, 3000);           // за NAT збір може зависнути
+    pc.addEventListener('icegatheringstatechange', () => {
+      if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
+    });
+  });
+}
+
+function netReset() {
+  if (net.ch) try { net.ch.close(); } catch (e) {}
+  if (net.pc) try { net.pc.close(); } catch (e) {}
+  net.role = null; net.pc = null; net.ch = null; net.snap = null; net.peerKeys = {};
+}
+
+function wireChannel(ch) {
+  net.ch = ch;
+  ch.onopen = () => {
+    if (net.role === 'client') {
+      netSay('✅ З\'єднано. Чекай — бій почне господар гри.');
+      flashMsg('🌐 Під\'єднано. Бій почне напарник');
+    } else {
+      netSay('✅ Напарник у грі. Тисни «НА ФРОНТ» — він заїде разом з тобою.');
+      flashMsg('🌐 Напарник у грі — рушай на фронт!');
+      netShow(false);
+    }
+  };
+  ch.onclose = () => {
+    netSay('🔌 З\'єднання розірвано');
+    flashMsg('🔌 Напарник від\'єднався');
+    // гра не має вмирати разом із каналом: хост доїжджає бій сам
+    if (net.role === 'client') {
+      // клієнта повертаємо в ангар: без хоста йому нема що показувати
+      net.role = null;
+      state = 'hangar';
+      document.body.classList.remove('inBattle');
+      document.getElementById('battleView').classList.add('hidden');
+      document.getElementById('frontView').classList.add('hidden');
+      document.getElementById('hangarView').classList.remove('hidden');
+      renderHangar();
+    }
+    else net.role = null;
+  };
+  ch.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (m.t === 'k') net.peerKeys = m.k || {};        // хост отримав натискання
+    else if (m.t === 's') net.snap = m;               // клієнт отримав знімок
+  };
+}
+
+async function netHost() {
+  netReset();
+  net.role = 'host';
+  net.pc = new RTCPeerConnection({ iceServers: ICE });
+  wireChannel(net.pc.createDataChannel('game', { ordered: false, maxRetransmits: 0 }));
+  await net.pc.setLocalDescription(await net.pc.createOffer());
+  await waitIce(net.pc);
+  return packSdp(net.pc.localDescription);
+}
+
+async function netHostAccept(answerCode) {
+  await net.pc.setRemoteDescription(unpackSdp(answerCode.trim(), 'answer'));
+  netSay('…рукостискання');
+}
+
+async function netJoin(offerCode) {
+  netReset();
+  net.role = 'client';
+  net.pc = new RTCPeerConnection({ iceServers: ICE });
+  net.pc.ondatachannel = e => wireChannel(e.channel);
+  await net.pc.setRemoteDescription(unpackSdp(offerCode.trim(), 'offer'));
+  await net.pc.setLocalDescription(await net.pc.createAnswer());
+  await waitIce(net.pc);
+  return packSdp(net.pc.localDescription);
+}
+
+// ---- знімок стану ----
+// Координати округлені до цілих: піксельна точність тут нічого не вирішує,
+// а розмір знімка падає вдвічі.
+const R0 = v => Math.round(v);
+function netSnapshot() {
+  const pk = t => t ? { x: R0(t.x), y: R0(t.y), d: t.dir, a: +t.turretAngle.toFixed(2),
+    h: t.hp, m: t.maxHp, l: t.lives, i: R0(t.invuln), s: t.size, f: R0(t.flash || 0),
+    tr: R0(t.tread || 0) } : null;
+  return {
+    t: 's',
+    g: grid.map(r => r.join('')).join('|'),        // 224 символи — дешево слати цілком
+    p1: pk(player), p2: pk(p2),
+    e: enemies.filter(e => !e.dead).map(e => ({
+      x: R0(e.x), y: R0(e.y), d: e.dir, a: +(e.turretAngle || 0).toFixed(2),
+      h: e.hp, m: e.maxHp, ty: e.type, s: e.size, sp: R0(e.spawning || 0),
+      b: e.buffIco || '', f: R0(e.flash || 0),
+    })),
+    hp: (battle.helpers || []).filter(h => !h.dead).map(pk),
+    // кулі малюються зі світним слідом, тож їм потрібен напрямок, а не лише точка
+    b: bullets.filter(b => !b.dead).map(b => ({
+      x: R0(b.x), y: R0(b.y), p: b.fromPlayer ? 1 : 0,
+      dx: +b.dx.toFixed(2), dy: +b.dy.toFixed(2), o: b.over ? 1 : 0,
+    })),
+    dr: drops.filter(d => !d.dead).map(d => ({ x: R0(d.x), y: R0(d.y), k: d.kind })),
+    mn: (battle.mines || []).map(m => ({ x: R0(m.x), y: R0(m.y), a: m.armed ? 1 : 0 })),
+    sk: (battle.strikes || []).map(k => ({ x: R0(k.x), y: R0(k.y), t: R0(k.t || 0) })),
+    st: {
+      ms: R0(battle.gameMs), fr: battle.frags, hq: battle.hqLeft, wf: R0(battle.waveFlash || 0),
+      hR: battle.homeR, hC: battle.homeC, hM: battle.homeMax, mode: battle.mode,
+      mod: battle.mod, map: battle.mapName, tier: battle.tank.tier, tid: battle.tank.id,
+      el: !!battle.elite, it: R0(battle.introT || 0), stars: battle.stars || 0,
+      shake: R0(shakeTime), freeze: R0(freezeTimer), wave: battle.wave,
+      q: spawnQueue.length,   // HUD показує, скільки ворогів ще попереду
+    },
+    state,
+  };
+}
+
+// Клієнт розкладає знімок у ті самі глобальні змінні, з якими працює рендер —
+// тому малювання не довелось дублювати жодним рядком.
+function netApply(s) {
+  if (!s) return;
+  // Клієнт ніколи не проходив через startBattle, тож службові масиви в нього
+  // порожні. Частинки й спливний текст — чиста косметика, через мережу їх не
+  // женемо: дешевше намалювати нічого, ніж слати сотні іскор 20 разів на секунду.
+  if (!Array.isArray(particles)) particles = [];
+  if (!Array.isArray(spawnPoints)) spawnPoints = [];
+  // довжина черги приїжджає числом — відтворюємо її як масив-заглушку,
+  // бо HUD рахує саме spawnQueue.length
+  spawnQueue = new Array(Math.max(0, (s.st && s.st.q) || 0)).fill('scout');
+  const rows = s.g.split('|');
+  grid = rows.map(r => r.split('').map(Number));
+  if (!gridHp || gridHp.length !== grid.length) gridHp = grid.map(r => r.map(() => 0));
+  const un = (o, base) => o ? Object.assign(base || {}, {
+    x: o.x, y: o.y, dir: o.d, turretAngle: o.a, hp: o.h, maxHp: o.m,
+    lives: o.l, invuln: o.i, size: o.s, flash: o.f, tread: o.tr, buffs: [],
+  }) : null;
+  player = un(s.p1, player) || player;
+  p2 = un(s.p2, p2);
+  if (p2) { p2.color = '#5ef0ff'; p2.tag = 'Гравець 2'; p2.isP2 = true; }
+  if (player) { player.color = '#39ff88'; player.tag = 'Гравець 1'; }
+  enemies = s.e.map(e => ({
+    x: e.x, y: e.y, dir: e.d, turretAngle: e.a, hp: e.h, maxHp: e.m, type: e.ty,
+    size: e.s, spawning: e.sp, buffIco: e.b, flash: e.f, dead: false, buffs: [],
+    color: (ENEMY_TYPES[e.ty] || {}).color || '#e06666',
+  }));
+  bullets = s.b.map(b => ({
+    x: b.x, y: b.y, fromPlayer: !!b.p, dx: b.dx, dy: b.dy, over: !!b.o, dead: false,
+  }));
+  drops = s.dr.map(d => ({ x: d.x, y: d.y, kind: d.k, dead: false, ttl: 9999 }));
+  const t = s.st;
+  battle = Object.assign(battle || {}, {
+    gameMs: t.ms, frags: t.fr, hqLeft: t.hq, waveFlash: t.wf, homeR: t.hR, homeC: t.hC,
+    homeMax: t.hM, mode: t.mode, mod: t.mod, mapName: t.map, elite: t.el, introT: t.it,
+    stars: t.stars, wave: t.wave, perks: battle && battle.perks || [],
+    tank: { tier: t.tier, id: t.tid }, helpers: (s.hp || []).map(h => un(h)),
+    turrets: battle && battle.turrets || [],
+    // рендер ітерує ці масиви — без них клієнт падав на першому ж кадрі
+    mines: (s.mn || []).map(m => ({ x: m.x, y: m.y, armed: !!m.a })),
+    strikes: (s.sk || []).map(k => ({ x: k.x, y: k.y, t: k.t })),
+  });
+  shakeTime = t.shake; freezeTimer = t.freeze;
+  // перемикання вигляду в клієнта: окремої showBattle у грі нема, тож робимо
+  // те саме, що робить startBattle — інакше поле просто не з'являлось
+  if (s.state === 'play' && state !== 'play') {
+    state = 'play';
+    document.getElementById('hangarView').classList.add('hidden');
+    document.getElementById('frontView').classList.add('hidden');
+    document.getElementById('netView').classList.add('hidden');
+    document.getElementById('battleView').classList.remove('hidden');
+    document.getElementById('resultOverlay').classList.add('hidden');
+    document.getElementById('perkOverlay').classList.add('hidden');
+    document.body.classList.add('inBattle');
+  } else if (s.state !== 'play' && state === 'play') {
+    state = s.state;
+  }
+}
+
+// Клієнт шле лише натискання — це кілька байтів, затримки не створює
+// Вхід шлеться ТАЙМЕРОМ, а не з кадру малювання: requestAnimationFrame
+// душиться у фоновій вкладці, і керування почало б відвалюватись щойно гравець
+// перемкнувся на інше вікно. Кілька байтів 30 разів на секунду каналу не тиснуть.
+let netKeyTimer = null;
+function netStartKeyPump() {
+  if (netKeyTimer) return;
+  netKeyTimer = setInterval(() => {
+    if (!netActive() || net.role !== 'client') return;
+    try { net.ch.send(JSON.stringify({ t: 'k', k: keys })); } catch (e) {}
+  }, 33);
+}
+function netSendKeys() { netStartKeyPump(); }
+function netSendSnap() {
+  if (!netActive() || net.role !== 'host') return;
+  const now = performance.now();
+  if (now - net.lastSend < SNAP_MS) return;
+  net.lastSend = now;
+  try { net.ch.send(JSON.stringify(netSnapshot())); } catch (e) {}
+}
+
+
+// ---- інтерфейс підключення ----
+const $n = id => document.getElementById(id);
+function netShow(on) { $n('netView').classList.toggle('hidden', !on); }
+net.onStatus = m => { const el = $n('netStatus'); if (el) el.textContent = m; };
+
+$n('netBtn').onclick = () => {
+  // WebRTC заблоковано в пісочниці артефактів — краще сказати це одразу,
+  // ніж дати людині копіювати коди, які нікуди не підключаться
+  if (typeof RTCPeerConnection === 'undefined') {
+    flashMsg('🌐 Онлайн тут недоступний — відкрий гру на сайті');
+    return;
+  }
+  $n('netPick').classList.remove('hidden');
+  $n('netHostFlow').classList.add('hidden');
+  $n('netJoinFlow').classList.add('hidden');
+  netSay('');
+  netShow(true);
+};
+$n('netClose').onclick = () => netShow(false);
+
+$n('netHostBtn').onclick = async () => {
+  $n('netPick').classList.add('hidden');
+  $n('netHostFlow').classList.remove('hidden');
+  netSay('…готую код');
+  try {
+    $n('netOffer').value = await netHost();
+    netSay('Код готовий. Чекаю відповідь напарника.');
+  } catch (e) { netSay('Не вдалось створити гру: ' + e.message); }
+};
+$n('netJoinBtn').onclick = () => {
+  $n('netPick').classList.add('hidden');
+  $n('netJoinFlow').classList.remove('hidden');
+};
+$n('netMakeAnswer').onclick = async () => {
+  netSay('…готую відповідь');
+  try {
+    $n('netAnswer').value = await netJoin($n('netOfferIn').value);
+    netSay('Відповідь готова. Надішли її господарю гри.');
+  } catch (e) { netSay('Код не підійшов: ' + e.message); }
+};
+$n('netAccept').onclick = async () => {
+  try { await netHostAccept($n('netAnswerIn').value); }
+  catch (e) { netSay('Відповідь не підійшла: ' + e.message); }
+};
+const copyTo = (from, btn) => {
+  $n(btn).onclick = () => {
+    const el = $n(from);
+    el.select();
+    try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); }
+    netSay('Скопійовано — надішли напарнику');
+  };
+};
+copyTo('netOffer', 'netCopy1');
+copyTo('netAnswer', 'netCopy2');
+
 // ---------- Ввід ----------
 // Класика: куди дивиться танк — туди й стріляє
 // У грі на одного стрілки й WASD роблять те саме — зручно будь-кому.
@@ -5043,7 +5391,7 @@ document.getElementById('pauseBtn').addEventListener('touchstart', e => {
 document.addEventListener('touchend', () => { /* дозволяє click після touch */ }, { passive: true });
 
 // ---------- Старт ----------
-const GAME_VERSION = 'v37 · удвох на одній клавіатурі';
+const GAME_VERSION = 'v38 · онлайн-кооператив без сервера';
 loadSave();
 document.getElementById('verTag').textContent = GAME_VERSION;
 renderHangar();
