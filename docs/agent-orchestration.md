@@ -23,3 +23,11 @@ The trusted shared runner regression suite is validated once as release infrastr
 Browser prerequisite: the verified Playwright 1.56.1 Noble image supplies system libraries; setup downloads the browser matching locked Playwright 1.62.1 into the candidate-local cache. No privileged apt installation is used. Browser checks require a capable isolated runtime and fail closed when unavailable.
 
 Publication freeze: commit `"frozen": true` in protected `.agent-orchestrator.json` on the target branch. A changed branch invalidates in-flight candidates. `AGENT_ORCHESTRATOR_FREEZE=1` is an additional startup stop, not a live publication lookup. The publisher uses no Variables API permission or cross-repository credential.
+
+## Enforced activation gates
+
+Require both `agent-orchestrator/review` and `agent-orchestrator/human-release` in branch protection. Independent review invalidates both statuses before each run, including base retarget events. The reporter checks the live same-repository open PR, default target, exact base and head before publishing either status. Nondefault publisher targets use separate `agent-orchestrator/nondefault-*` contexts and cannot satisfy default-branch gates.
+
+Ordinary approved changes receive both successes. Protected changes may pass independent AI review while `human-release` stays pending. A human collaborator with write, maintain, or admin permission must explicitly run **Explicit human agent release** on the default branch, supplying the PR number, exact reviewed head/base SHAs, and `approve`. The release gate verifies live PR metadata, current GitHub Actions AI-review provenance, and the review run's matching PR/base/head before releasing. The human may be the PR author: this release acknowledges risk after independent AI review; it does not replace that review. New commits or new review runs invalidate previous release approval. No future protected change is released automatically.
+
+The release workflow checks out only trusted default-branch code and receives no model credential. Metadata permissions allow reading PRs, collaborator permissions and workflow-run provenance; its only write permission is commit statuses. Missing or stale metadata fails closed. This gate is separate from formal pull-request approval rules and supports repositories with a single human owner.
