@@ -195,6 +195,133 @@ BLOCKS.music = async browser => {
   await page.close();
 };
 
+// ТЕЛЕФОН. Цей блок зник разом із тимчасовою текою, і мобільний лишився
+// неперевіреним через переробку ангара, HUD, кооперативу й онлайну. Тут
+// справжній тач: джойстик тягнемо пальцем, по кнопках тикаємо.
+BLOCKS.mobile = async browser => {
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },       // типовий телефон
+    deviceScaleFactor: 3, isMobile: true, hasTouch: true,
+  });
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', e => errs.push(e.message));
+  await page.goto(GAME);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForTimeout(400);
+
+  // ангар: кнопка бою має бути досяжною, без горизонтального скролу
+  const h = await page.evaluate(() => {
+    const b = document.getElementById('battleBtn').getBoundingClientRect();
+    return {
+      wScroll: document.documentElement.scrollWidth,
+      wClient: document.documentElement.clientWidth,
+      btnVisible: b.top < innerHeight && b.bottom > 0 && b.width > 100,
+      btnH: Math.round(b.height),
+      chips: document.querySelectorAll('.chip').length,
+      coop: !!document.getElementById('coopBtn').offsetParent,
+      net: !!document.getElementById('netBtn').offsetParent,
+    };
+  });
+  t('ангар без горизонтального скролу', h.wScroll <= h.wClient + 1, `${h.wScroll} / ${h.wClient}`);
+  t('«НА ФРОНТ» видно і в неї можна влучити', h.btnVisible && h.btnH >= 40, `висота ${h.btnH}px`);
+  t('дерево танків на місці', h.chips === 14, `${h.chips} чіпів`);
+  t('кнопки кооперативу й онлайну доступні', h.coop && h.net);
+
+  // по кнопках реально можна тикнути пальцем
+  await page.tap('#coopBtn');
+  const coopOn = await page.evaluate(() => save.coop);
+  t('кооператив вмикається дотиком', coopOn === true);
+  await page.tap('#coopBtn');
+
+  // у бій
+  await page.evaluate(() => startBattle({ id: null, name: 't', map: 'Полігон', mode: 'clear', mod: null }));
+  await page.waitForTimeout(400);
+  const ui = await page.evaluate(() => {
+    const pad = document.getElementById('touchPad'), fire = document.getElementById('fireBtn');
+    const g = document.getElementById('game').getBoundingClientRect();
+    return {
+      pad: pad ? pad.getBoundingClientRect() : null,
+      fire: fire ? fire.getBoundingClientRect() : null,
+      canvasFits: g.width <= innerWidth + 1 && g.height <= innerHeight + 1,
+      gw: Math.round(g.width), gh: Math.round(g.height),
+    };
+  });
+  t('поле бою влазить в екран', ui.canvasFits, `${ui.gw}×${ui.gh} при ${390}×${844}`);
+  t('джойстик і кнопка вогню на екрані', !!ui.pad && !!ui.fire,
+    ui.pad ? `джойстик ${Math.round(ui.pad.width)}px, вогонь ${Math.round(ui.fire.width)}px` : 'нема');
+
+  // Джойстик живе на #stick (а не на #touchPad — на цьому я спіймався сам),
+  // центр він бере з власного прямокутника, і є мертва зона 14 px.
+  const joy = await page.evaluate(async () => {
+    const st = document.getElementById('stick');
+    if (!st) return { none: true };
+    const r = st.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const from = { x: player.x, y: player.y };
+    const touch = (type, px, py) => st.dispatchEvent(new TouchEvent(type, {
+      bubbles: true, cancelable: true,
+      touches: type === 'touchend' ? [] : [new Touch({ identifier: 7, target: st, clientX: px, clientY: py })],
+      changedTouches: [new Touch({ identifier: 7, target: st, clientX: px, clientY: py })],
+    }));
+    touch('touchstart', cx, cy);
+    touch('touchmove', cx, cy - 45);        // вище мертвої зони — їдемо вгору
+    const keyUp = keys.up;
+    await new Promise(r => setTimeout(r, 700));
+    const to = { x: player.x, y: player.y };
+    touch('touchend', cx, cy - 45);
+    return { keyUp, moved: Math.hypot(to.x - from.x, to.y - from.y), after: keys.up };
+  });
+  t('джойстик вмикає напрямок', !joy.none && joy.keyUp === true);
+  t('джойстик рухає танк', !joy.none && joy.moved > 8, `зсув ${(joy.moved || 0).toFixed(0)}px`);
+  t('відпускання джойстика зупиняє танк', !joy.none && joy.after === false);
+
+  // Постріли рахуємо лічильником, а не довжиною масиву куль: кулі встигають
+  // влучити й зникнути всередині вікна заміру, і тоді різниця виходить нулем.
+  const shot = await page.evaluate(async () => {
+    const orig = window.shoot || shoot;
+    let n = 0;
+    window.shoot = function (tank, isPlayer) { if (isPlayer) n++; return orig.apply(this, arguments); };
+    const fire = document.getElementById('fireBtn');
+    fire.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [], changedTouches: [] }));
+    const keySet = keys.fire;
+    await new Promise(r => setTimeout(r, 1200));
+    fire.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], changedTouches: [] }));
+    const keyCleared = keys.fire === false;
+    window.shoot = orig;
+    return { n, keySet, keyCleared };
+  });
+  t('кнопка вогню тисне на гашетку', shot.keySet === true);
+  t('кнопка вогню справді стріляє', shot.n > 0, `пострілів ${shot.n}`);
+  t('відпускання кнопки припиняє вогонь', shot.keyCleared);
+
+  // ЗАПИСАНЕ ОБМЕЖЕННЯ. На телефоні один джойстик і одна гашетка, і обидва
+  // пишуть у keys — тобто в ДРУГОГО гравця сенсорного керування нема. Удвох
+  // на одному телефоні не вийде; удвох з телефонів — вийде, бо кожен керує
+  // своїм пристроєм, а онлайн-клієнт шле саме keys.
+  const twoOnePhone = await page.evaluate(() => {
+    save.coop = true;
+    startBattle({ id: null, name: 't', map: 'Полігон', mode: 'clear', mod: null });
+    const before = { x: p2.x, y: p2.y };
+    keys.up = true;                       // єдиний джойстик телефона
+    return { before, p2exists: !!p2 };
+  });
+  await page.waitForTimeout(600);
+  const twoAfter = await page.evaluate(() => {
+    keys.up = false;
+    return { p2moved: Math.hypot(p2.x - 0, p2.y - 0) };
+  });
+  const p2Still = await page.evaluate(() => ({ x: p2.x, y: p2.y }));
+  t('на одному телефоні другим танком керувати НЕ можна (відоме обмеження)',
+    twoOnePhone.p2exists &&
+    Math.hypot(p2Still.x - twoOnePhone.before.x, p2Still.y - twoOnePhone.before.y) < 3,
+    'сенсор керує лише першим — удвох треба з двох пристроїв через онлайн');
+
+  t('без помилок сторінки', errs.length === 0, errs[0] || '');
+  await ctx.close();
+};
+
 // ОНЛАЙН. Тут потрібні ДВІ сторінки й справжній WebRTC між ними — підробити
 // це моками безглуздо: саме з'єднання і є те, що може зламатись.
 BLOCKS.online = async browser => {
